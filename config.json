@@ -1,0 +1,56 @@
+{
+  "timezone": "America/Argentina/Buenos_Aires",
+  "opening_hours": [
+    {
+      "start": "08:00",
+      "end": "13:00"
+    },
+    {
+      "start": "17:00",
+      "end": "00:00"
+    }
+  ],
+  "starting_money": 2500,
+  "fiado_xp_required": 2000,
+  "fiado_debt_limit": 5000,
+  "message_xp_min": 3,
+  "message_xp_max": 7,
+  "message_xp_cooldown_seconds": 60,
+  "daily_money_min": 600,
+  "daily_money_max": 1200,
+  "daily_xp_min": 30,
+  "daily_xp_max": 60,
+  "daily_cooldown_hours": 24,
+  "changuita_cooldown_minutes": 30,
+  "changuita_tiers": {
+    "facil": {
+      "name": "Fácil",
+      "money_min": 150,
+      "money_max": 300,
+      "xp_min": 10,
+      "xp_max": 20
+    },
+    "normal": {
+      "name": "Normal",
+      "money_min": 300,
+      "money_max": 600,
+      "xp_min": 20,
+      "xp_max": 35
+    },
+    "pesada": {
+      "name": "Pesada",
+      "money_min": 600,
+      "money_max": 1000,
+      "xp_min": 35,
+      "xp_max": 60
+    }
+  },
+  "stock_min_initial": 3,
+  "stock_max_initial": 7,
+  "stock_restock_amount_min": 1,
+  "stock_restock_amount_max": 3,
+  "stock_restock_interval_minutes": 30,
+  "offer_day_chance": 0.20,
+  "offer_discount_percent_min": 25,
+  "offer_discount_percent_max": 40
+}

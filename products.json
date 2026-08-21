@@ -1,0 +1,122 @@
+[
+  {
+    "id": "guaymallen",
+    "name": "Guaymallén",
+    "emoji": "🍫",
+    "price": 500,
+    "xp": 15,
+    "description": "Clásico de kiosco. Desaparece antes de llegar a casa."
+  },
+  {
+    "id": "pico_dulce",
+    "name": "Pico Dulce",
+    "emoji": "🍭",
+    "price": 150,
+    "xp": 4,
+    "description": "Una inversión económica y pegajosa."
+  },
+  {
+    "id": "manaos",
+    "name": "Manaos",
+    "emoji": "🥤",
+    "price": 900,
+    "xp": 20,
+    "description": "La gaseosa oficial de decisiones cuestionables."
+  },
+  {
+    "id": "don_satur",
+    "name": "Don Satur",
+    "emoji": "🍪",
+    "price": 700,
+    "xp": 17,
+    "description": "Abrís el paquete para comer dos. Mentira."
+  },
+  {
+    "id": "baggio",
+    "name": "Baggio",
+    "emoji": "🧃",
+    "price": 650,
+    "xp": 14,
+    "description": "Nostalgia de recreo en cajita."
+  },
+  {
+    "id": "tita",
+    "name": "Tita",
+    "emoji": "🍫",
+    "price": 450,
+    "xp": 10,
+    "description": "Chiquita, simple y peligrosamente fácil de repetir."
+  },
+  {
+    "id": "rhodesia",
+    "name": "Rhodesia",
+    "emoji": "🍫",
+    "price": 500,
+    "xp": 11,
+    "description": "Prima crocante de la Tita."
+  },
+  {
+    "id": "jorgito",
+    "name": "Jorgito",
+    "emoji": "🍫",
+    "price": 800,
+    "xp": 18,
+    "description": "Un alfajor serio para situaciones serias."
+  },
+  {
+    "id": "chicle",
+    "name": "Chicle",
+    "emoji": "🫧",
+    "price": 200,
+    "xp": 5,
+    "description": "Dura bastante menos de lo que jurabas."
+  },
+  {
+    "id": "agua",
+    "name": "Agua",
+    "emoji": "💧",
+    "price": 600,
+    "xp": 8,
+    "description": "La compra responsable del kiosquito."
+  },
+  {
+    "id": "flynn_paff",
+    "name": "Flynn Paff",
+    "emoji": "🍬",
+    "price": 250,
+    "xp": 6,
+    "description": "Caramelo masticable con sabor a infancia y kiosco de barrio."
+  },
+  {
+    "id": "oreos",
+    "name": "Oreos",
+    "emoji": "🍪",
+    "price": 1100,
+    "xp": 24,
+    "description": "Abrís el paquete para comer una y de repente no queda ninguna."
+  },
+  {
+    "id": "pepitos",
+    "name": "Pepitos",
+    "emoji": "🍪",
+    "price": 1000,
+    "xp": 22,
+    "description": "Galletitas con chips de chocolate. Nunca sobran."
+  },
+  {
+    "id": "ades",
+    "name": "Ades",
+    "emoji": "🧃",
+    "price": 850,
+    "xp": 18,
+    "description": "Juguito de soja/fruta para cuando querés fingir que elegiste algo sano."
+  },
+  {
+    "id": "cindor",
+    "name": "Cindor",
+    "emoji": "🥛",
+    "price": 1200,
+    "xp": 26,
+    "description": "Chocolatada fría, nivel recreo premium."
+  }
+]
