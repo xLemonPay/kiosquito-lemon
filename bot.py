@@ -27,8 +27,8 @@ with open(ROOT / "products.json", "r", encoding="utf-8") as f:
 PRODUCTS = {p["id"]: p for p in PRODUCT_LIST}
 
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
-TEST_GUILD_ID_RAW = os.getenv("TEST_GUILD_ID", "").strip()
+TOKEN = os.getenv("DISCORD_TOKEN", "").strip().strip('"').strip("'")
+TEST_GUILD_ID_RAW = os.getenv("TEST_GUILD_ID", "").strip().strip('"').strip("'")
 TEST_GUILD_ID = int(TEST_GUILD_ID_RAW) if TEST_GUILD_ID_RAW.isdigit() else None
 
 if not TOKEN:
