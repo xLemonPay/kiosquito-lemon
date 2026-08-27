@@ -52,6 +52,8 @@ Permisos mínimos recomendados:
 
 - View Channels
 - Send Messages
+- Manage Messages (para limpiar consumos y renovar el panel)
+- Manage Channels (para crear automáticamente el canal #el-kiosquito-de-lemon)
 - Embed Links
 - Read Message History
 

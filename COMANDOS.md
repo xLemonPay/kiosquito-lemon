@@ -14,12 +14,23 @@
 - **Reposición Gradual**: Cada 30 minutos el kiosquero repone stock de productos escasos. También se repone cuando los usuarios completan changuitas de orden/reposición.
 - **Probabilidad de Ofertas**: Al abrir la jornada, hay un **20% de probabilidad** de que el kiosquero lance **Promos de la Jornada** (con 25% a 40% de descuento en productos seleccionados), anunciadas en el mensaje fijo del canal.
 
-## 🧹 Changuitas Interactivas (Mini-juegos con botones)
-- `/changuitas` o `/changuita` — Abre la bolsa de trabajo del kiosquito. Cada trabajo cuenta con un mini-juego interactivo de 3 pasos por botones. Cooldown: 30 minutos.
-  - **Fácil ($150 – $300 | 10–20 XP):** Barrer el piso, Sacar la basura, Limpiar la entrada/vereda, Sacar telarañas, Desinfectar mostradores.
-  - **Normal ($300 – $600 | 20–35 XP):** Trapear, Limpiar vidrios, Limpiar estantes, Limpiar derrames, Ordenar productos, Reponer artículos de limpieza.
-  - **Pesada ($600 – $1.000 | 35–60 XP):** Ordenar el depósito, Acomodar cajones de bebidas, Limpiar la heladera, Mover cajas, Limpieza profunda del depósito.
-  - ⚠️ *¡Si te equivocás de botón en un paso, te rajan del laburo sin un mango y con 30 min de sanción!*
+## 🧹 Changuitas y Minijuegos Interactivos
+- `/changuitas` o `/changuita` — Abre la bolsa de trabajo del kiosquito. Cada trabajo incluye minijuegos interactivos arcade en vivo con botones y tableros. Cooldown: 30 minutos.
+  - **Fácil ($150 – $300 | 10–20 XP):**
+    - 🧹 **Barrer el piso (Grilla 3×3):** Limpiar las casillas de basura (`🍂`, `🧻`) sin tocar la cucaracha `🪳`.
+    - Sacar la basura, Limpiar la entrada/vereda, Sacar telarañas, Desinfectar mostradores.
+  - **Normal ($300 – $600 | 20–35 XP):**
+    - 🧮 **Cobrar en la caja (Cálculo mental de vuelto):** El cliente paga con un billete y vos debés armar el vuelto exacto con botones de plata sin que el bot te diga el resultado.
+    - 🍫 **Ordenar productos (Simón Dice de Góndola):** Memorizar la secuencia de 4 golosinas y acomodarlas en orden.
+    - 🪟 **Limpiar vidrios (Secador en cadena):** Pasar la espátula secavidrios en el orden exacto (1 ➔ 2 ➔ 3 ➔ 4).
+    - 🥤 **Atajar las Manaos (Arcade de reflejos):** Mover la canasta con `⬅️` y `➡️` para atajar las botellas que caen del camión.
+    - 📦 **Buscaminas del Depósito (Riesgo):** Abrir cajas de mercadería acumulando plata con la opción de retirarte seguro o arriesgarte a que salte la rata.
+    - Trapear, Limpiar estantes, Limpiar derrames, Reponer artículos de limpieza.
+  - **Pesada ($600 – $1.000 | 35–60 XP):**
+    - 🏋️ **Mover cajas pesadas (Barra de Fuerza QTE):** Presionar rápido `¡HACER FUERZA!` para llenar la barra al 100% esquivando el botón trampa.
+    - ❄️ **Reparar la Heladera (Minijuego Técnico - Evento Raro):** Conectar los cables correctos y calibrar el termostato a frío (0°C a 4°C).
+    - Ordenar el depósito, Acomodar cajones de bebidas, Limpiar la heladera, Limpieza profunda del depósito.
+  - ⚠️ *¡Si te equivocás en un paso o juego, te rajan del laburo sin un mango y con 30 min de sanción!*
 
 ## 💵 Economía y Progresión
 - `/perfil [usuario]` — Saldo en billetera, XP acumulada, deuda y barra de progreso del fiado.

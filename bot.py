@@ -40,7 +40,7 @@ TZ = ZoneInfo(CONFIG["timezone"])
 MESSAGE_XP_COOLDOWNS: dict[tuple[int, int], float] = {}
 BOT_VERSION = "3.2"
 
-# ---------- DEFINICIÓN DE LAS 16 CHANGUITAS ----------
+# ---------- DEFINICIÓN DE LAS CHANGUITAS ----------
 CHANGUITAS_LIST = [
     # --- FÁCILES ($150 - $300) ---
     {
@@ -48,27 +48,8 @@ CHANGUITAS_LIST = [
         "name": "Barrer el piso",
         "emoji": "🧹",
         "tier": "facil",
-        "desc": "Barrer la tierra y papelitos del salón de ventas.",
-        "steps": [
-            {
-                "text": "Hay mugre por todo el piso. ¿Qué herramienta agarrás primero?",
-                "correct_btn": ("Agarrar la escoba", "🧹"),
-                "wrong_btn": ("Sentarse en el cajón de birra", "🛋️"),
-                "fail_text": "¡Te sentaste a rascarte y el kiosquero te descubrió durmiendo una siesta!",
-            },
-            {
-                "text": "¡Bien! Juntá toda la mugre acumulada en un montoncito.",
-                "correct_btn": ("Juntar con la pala", "🪣"),
-                "wrong_btn": ("Esconder abajo de la heladera", "👟"),
-                "fail_text": "¡Pateaste la mugre abajo de la heladera exhibidora y se llenó de cucarachas!",
-            },
-            {
-                "text": "Último paso: tirá la basura juntada.",
-                "correct_btn": ("Tirar al tacho de basura", "🗑️"),
-                "wrong_btn": ("Dejar que se vuele sola", "💨"),
-                "fail_text": "¡Dejaste que el ventilador vuele la basura por todo el kiosco!",
-            },
-        ],
+        "desc": "Barrer mugre del salón evitando la cucaracha.",
+        "is_minigame": "barrer",
     },
     {
         "id": "sacar_basura",
@@ -180,6 +161,30 @@ CHANGUITAS_LIST = [
     },
     # --- NORMALES ($300 - $600) ---
     {
+        "id": "cobrar_caja",
+        "name": "Cobrar en la caja",
+        "emoji": "🧮",
+        "tier": "normal",
+        "desc": "Calcular y entregar el vuelto exacto a los clientes.",
+        "is_minigame": "caja",
+    },
+    {
+        "id": "limpiar_vidrios",
+        "name": "Limpiar vidrios con secador",
+        "emoji": "🪟",
+        "tier": "normal",
+        "desc": "Pasar la espátula secavidrios en orden por la vidriera.",
+        "is_minigame": "vidrios",
+    },
+    {
+        "id": "ordenar_productos",
+        "name": "Ordenar productos en góndola",
+        "emoji": "🍫",
+        "tier": "normal",
+        "desc": "Memorizar y acomodar los productos en la secuencia pedida.",
+        "is_minigame": "ordenar",
+    },
+    {
         "id": "trapear",
         "name": "Trapear",
         "emoji": "🪣",
@@ -203,33 +208,6 @@ CHANGUITAS_LIST = [
                 "correct_btn": ("Pasar en zigzag cubriendo todo", "✨"),
                 "wrong_btn": ("Pisar con las zapatillas con barro", "👟"),
                 "fail_text": "¡Caminaste con barro por encima de lo recién trapeado frente al dueño!",
-            },
-        ],
-    },
-    {
-        "id": "limpiar_vidrios",
-        "name": "Limpiar vidrios",
-        "emoji": "🪟",
-        "tier": "normal",
-        "desc": "Dejar relucientes los ventanales y la vidriera frontal.",
-        "steps": [
-            {
-                "text": "La vidriera principal tiene marcas de dedos y polvo de la calle.",
-                "correct_btn": ("Rociar líquido limpiavidrios azul", "🧴"),
-                "wrong_btn": ("Tirarle detergente puro sin diluir", "🧼"),
-                "fail_text": "¡Hiciste un mar de espuma inmanejable que tapó toda la vidriera!",
-            },
-            {
-                "text": "El producto está actuando en el vidrio.",
-                "correct_btn": ("Frotar con paño de microfibra", "🧽"),
-                "wrong_btn": ("Pasarle una lija para madera", "📄"),
-                "fail_text": "¡Rayaste todo el ventanal frontal con la lija! ¡Sale una fortuna cambiarlo!",
-            },
-            {
-                "text": "Hora de sacar el excedente sin dejar marcas.",
-                "correct_btn": ("Pasar la espátula secavidrios", "✨"),
-                "wrong_btn": ("Dejar que se seque al sol directo", "☀️"),
-                "fail_text": "¡Se secó al rayo del sol y quedó como una nube de grasa opaca!",
             },
         ],
     },
@@ -288,33 +266,6 @@ CHANGUITAS_LIST = [
         ],
     },
     {
-        "id": "ordenar_productos",
-        "name": "Ordenar productos",
-        "emoji": "🍫",
-        "tier": "normal",
-        "desc": "Frentear alfajores, gomitas y caramelos.",
-        "steps": [
-            {
-                "text": "La caramelera está toda desordenada.",
-                "correct_btn": ("Frentear alfajores y chocolates", "🍫"),
-                "wrong_btn": ("Comerte un Guaymallén a escondidas", "🤤"),
-                "fail_text": "¡Te comiste un Guaymallén triple y te vieron por las cámaras de seguridad!",
-            },
-            {
-                "text": "Los snacks quedaron aplastados al fondo.",
-                "correct_btn": ("Acomodar papas y chizitos inflados", "🍟"),
-                "wrong_btn": ("Apretar las bolsas para que ocupen menos", "🔨"),
-                "fail_text": "¡Aplastaste las bolsas de papas fritas y las convertiste en puré!",
-            },
-            {
-                "text": "Faltan los tubos de caramelos.",
-                "correct_btn": ("Rellenar frascos de Flynn Paff", "🍬"),
-                "wrong_btn": ("Llenarte los bolsillos de caramelos", "🍭"),
-                "fail_text": "¡Se te cayeron 15 chupetines del bolsillo delante del encargado!",
-            },
-        ],
-    },
-    {
         "id": "reponer_limpieza",
         "name": "Reponer artículos de limpieza",
         "emoji": "🧼",
@@ -341,7 +292,39 @@ CHANGUITAS_LIST = [
             },
         ],
     },
+    {
+        "id": "minijuego_atajar",
+        "name": "Atajar las Manaos",
+        "emoji": "🥤",
+        "tier": "normal",
+        "desc": "Atajá las botellas que caen del camión de reparto.",
+        "is_minigame": "atajar",
+    },
+    {
+        "id": "minijuego_deposito",
+        "name": "Buscaminas del depósito",
+        "emoji": "📦",
+        "tier": "normal",
+        "desc": "Buscá mercadería en las cajas del fondo esquivando la rata.",
+        "is_minigame": "deposito",
+    },
     # --- PESADAS ($600 - $1.000) ---
+    {
+        "id": "mover_cajas",
+        "name": "Mover cajas pesadas",
+        "emoji": "🏋️",
+        "tier": "pesada",
+        "desc": "Hacer fuerza rápida para subir la carga pesada al depósito.",
+        "is_minigame": "cajas",
+    },
+    {
+        "id": "minijuego_heladera",
+        "name": "Reparar heladera y termostato",
+        "emoji": "❄️",
+        "tier": "pesada",
+        "desc": "Conectar cables y calibrar el termostato a frío.",
+        "is_minigame": "heladera",
+    },
     {
         "id": "ordenar_deposito",
         "name": "Ordenar el depósito",
@@ -514,15 +497,44 @@ def opening_hours_text() -> str:
     )
 
 
+def get_current_schedule_period(now: datetime | None = None) -> str | None:
+    now = now or datetime.now(TZ)
+    current = minutes_now(now)
+    date_str = now.strftime("%Y-%m-%d")
+
+    for period in CONFIG["opening_hours"]:
+        start = parse_hhmm(period["start"])
+        end = parse_hhmm(period["end"])
+        if end == 0 and start > 0:
+            end = 24 * 60
+        if start <= current < end:
+            return f"{date_str}_{period['start']}"
+
+    return None
+
+
 def is_open(now: datetime | None = None, guild_id: int | None = None) -> bool:
+    now = now or datetime.now(TZ)
+
     if guild_id is not None:
         manual_open, _ = manual_open_status(guild_id)
         if manual_open:
             return True
 
-    now = now or datetime.now(TZ)
-    current = minutes_now(now)
+        # Verificar si un admin forzó el cierre de este turno
+        current_period = get_current_schedule_period(now)
+        force_closed = get_setting(guild_id, "force_closed_period", "")
+        if force_closed:
+            if current_period and force_closed == current_period:
+                return False
+            elif not current_period:
+                # Terminó el turno que estaba forzado a cerrar
+                set_setting(guild_id, "force_closed_period", "")
+            elif current_period and force_closed != current_period:
+                # Llegó un nuevo turno de apertura programada
+                set_setting(guild_id, "force_closed_period", "")
 
+    current = minutes_now(now)
     for period in CONFIG["opening_hours"]:
         start = parse_hhmm(period["start"])
         end = parse_hhmm(period["end"])
@@ -872,11 +884,31 @@ def get_shift_consumption_messages(guild_id: int, shift_id: int):
         ).fetchall()
 
 
+def get_guild_consumption_messages(guild_id: int):
+    with get_connection() as conn:
+        return conn.execute(
+            """
+            SELECT channel_id, message_id
+            FROM consumption_messages
+            WHERE guild_id=?
+            """,
+            (guild_id,),
+        ).fetchall()
+
+
 def delete_shift_consumption_records(guild_id: int, shift_id: int) -> None:
     with get_connection() as conn:
         conn.execute(
             "DELETE FROM consumption_messages WHERE guild_id=? AND shift_id=?",
             (guild_id, shift_id),
+        )
+
+
+def delete_all_consumption_records(guild_id: int) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM consumption_messages WHERE guild_id=?",
+            (guild_id,),
         )
 
 
@@ -1429,28 +1461,1174 @@ class ChanguitaWorkView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=self)
 
 
+# ---------- MINIJUEGOS INTERACTIVOS EN VIVO ----------
+
+class AtajarManaosMinigameView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=120)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.interaction = parent_interaction
+        self.grid_w = 5
+        self.grid_h = 4
+        self.basket_x = 2
+        self.bottle_x = random.randint(0, 4)
+        self.bottle_y = 0
+        self.score = 0
+        self.target_score = 3
+        self.lives = 2
+        self.game_over = False
+        self.last_action = "¡Mové la canasta 🧺 con los botones para atajar la Manaos 🥤 antes de que toque el suelo!"
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.clear_items()
+        if not self.game_over:
+            btn_left = discord.ui.Button(label="Mover Izquierda", emoji="⬅️", style=discord.ButtonStyle.primary)
+            btn_down = discord.ui.Button(label="Esperar / Bajar", emoji="⬇️", style=discord.ButtonStyle.secondary)
+            btn_right = discord.ui.Button(label="Mover Derecha", emoji="➡️", style=discord.ButtonStyle.primary)
+
+            btn_left.callback = self.on_move_left
+            btn_down.callback = self.on_move_down
+            btn_right.callback = self.on_move_right
+
+            self.add_item(btn_left)
+            self.add_item(btn_down)
+            self.add_item(btn_right)
+
+    def render_board(self) -> str:
+        lines = []
+        for y in range(self.grid_h):
+            row = []
+            for x in range(self.grid_w):
+                if y == self.bottle_y and x == self.bottle_x:
+                    if y == self.grid_h - 1:
+                        if x == self.basket_x:
+                            row.append("🎯")
+                        else:
+                            row.append("💥")
+                    else:
+                        row.append("🥤")
+                elif y == self.grid_h - 1 and x == self.basket_x:
+                    row.append("🧺")
+                else:
+                    row.append("⬛")
+            lines.append("".join(row))
+        return "\n".join(lines)
+
+    def build_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title="🥤 Minijuego: Atajar las Manaos",
+            description=(
+                f"🎯 **Atajadas:** `{self.score}/{self.target_score}`  •  ❤️ **Vidas:** `{self.lives}`\n\n"
+                f"{self.render_board()}\n\n"
+                f"ℹ️ *{self.last_action}*"
+            ),
+            color=discord.Color.blue() if not self.game_over else (discord.Color.green() if self.score >= self.target_score else discord.Color.red()),
+        )
+        return embed
+
+    async def advance_tick(self, interaction: discord.Interaction):
+        self.bottle_y += 1
+        if self.bottle_y == self.grid_h - 1:
+            if self.basket_x == self.bottle_x:
+                self.score += 1
+                self.last_action = "🎯 ¡Excelente atajada! +1 botella salvada."
+            else:
+                self.lives -= 1
+                self.last_action = "💥 ¡SE REVENTÓ UNA MANAOS EN EL PISO!"
+
+            if self.score >= self.target_score:
+                self.game_over = True
+                await self.on_win(interaction)
+                return
+            elif self.lives <= 0:
+                self.game_over = True
+                await self.on_fail(interaction)
+                return
+            else:
+                self.bottle_x = random.randint(0, self.grid_w - 1)
+                self.bottle_y = 0
+
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def on_move_left(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este juego no es tuyo! 😅", ephemeral=True)
+            return
+        if self.basket_x > 0:
+            self.basket_x -= 1
+        await self.advance_tick(interaction)
+
+    async def on_move_right(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este juego no es tuyo! 😅", ephemeral=True)
+            return
+        if self.basket_x < self.grid_w - 1:
+            self.basket_x += 1
+        await self.advance_tick(interaction)
+
+    async def on_move_down(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este juego no es tuyo! 😅", ephemeral=True)
+            return
+        await self.advance_tick(interaction)
+
+    async def on_win(self, interaction: discord.Interaction):
+        cash = random.randint(350, 600)
+        xp = random.randint(25, 40)
+        now = int(time.time())
+
+        with get_connection() as conn:
+            ensure_user(conn, self.guild_id, self.user_id)
+            conn.execute(
+                "UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?",
+                (cash, xp, now, self.guild_id, self.user_id),
+            )
+            user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+        restock_kiosk(self.guild_id, 1, 2)
+
+        embed = discord.Embed(
+            title="🎉 ¡VICTORIA! 🥤 Atajaste todas las Manaos",
+            description=(
+                f"{self.render_board()}\n\n"
+                f"¡Sos un maestro de los reflejos! No se rompió ni una sola botella.\n\n"
+                f"💵 **Cobraste:** +{money(cash)}\n"
+                f"⭐ **Ganaste:** +{xp} XP\n\n"
+                f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+            ),
+            color=discord.Color.green(),
+        )
+        self.clear_items()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_fail(self, interaction: discord.Interaction):
+        now = int(time.time())
+        with get_connection() as conn:
+            ensure_user(conn, self.guild_id, self.user_id)
+            conn.execute(
+                "UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?",
+                (now, self.guild_id, self.user_id),
+            )
+
+        embed = discord.Embed(
+            title="💥 ¡TE RAJARON DEL KIOSCO!",
+            description=(
+                f"{self.render_board()}\n\n"
+                f"❌ Rompiste las botellas y llenaste el pasillo de gas y líquido pegajoso.\n"
+                f"🧔 **El Kiosquero:** *«¡Me hiciste perder mercadería! ¡Volá de acá!»*\n\n"
+                f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+            ),
+            color=discord.Color.red(),
+        )
+        self.clear_items()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+
+class RepararHeladeraMinigameView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.interaction = parent_interaction
+        self.phase = 1
+        self.cables_step = 0
+        self.temp = 24
+        self.target_min = 0
+        self.target_max = 4
+        self.setup_phase_1()
+
+    def setup_phase_1(self):
+        self.clear_items()
+        if self.cables_step == 0:
+            options = [
+                ("⚡ Termostato del Compresor", True),
+                ("🌊 Caño de desagüe de agua", False),
+                ("🚪 Burlete de goma", False),
+            ]
+        elif self.cables_step == 1:
+            options = [
+                ("💡 Luz decorativa rota", False),
+                ("❄️ Ventilador del evaporador", True),
+                ("🍫 Estante de golosinas", False),
+            ]
+        else:
+            options = [
+                ("🔩 Chasis metálico de masa", True),
+                ("🔌 Puentear directo a 220V", False),
+                ("🧊 Bloque de hielo", False),
+            ]
+
+        random.shuffle(options)
+        for label, is_correct in options:
+            btn = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
+            if is_correct:
+                btn.callback = self.on_correct_cable
+            else:
+                btn.callback = self.on_wrong_cable
+            self.add_item(btn)
+
+    def setup_phase_2(self):
+        self.clear_items()
+        btn_cool_big = discord.ui.Button(label="Gas Rápido (-10°C)", emoji="❄️", style=discord.ButtonStyle.primary)
+        btn_cool_small = discord.ui.Button(label="Gas Fino (-4°C)", emoji="🧊", style=discord.ButtonStyle.primary)
+        btn_heat = discord.ui.Button(label="Abrir Válvula (+6°C)", emoji="🔥", style=discord.ButtonStyle.secondary)
+        btn_lock = discord.ui.Button(label="Bloquear Termostato", emoji="✅", style=discord.ButtonStyle.success)
+
+        btn_cool_big.callback = lambda i: self.adjust_temp(i, -10)
+        btn_cool_small.callback = lambda i: self.adjust_temp(i, -4)
+        btn_heat.callback = lambda i: self.adjust_temp(i, +6)
+        btn_lock.callback = self.lock_thermostat
+
+        self.add_item(btn_cool_big)
+        self.add_item(btn_cool_small)
+        self.add_item(btn_heat)
+        self.add_item(btn_lock)
+
+    def build_embed(self) -> discord.Embed:
+        if self.phase == 1:
+            cables = ["🔴 Rojo (Fase Principal)", "🔵 Azul (Neutro)", "🟢 Verde (Descarga a Tierra)"]
+            current_wire = cables[self.cables_step]
+            embed = discord.Embed(
+                title="❄️ Minijuego: Reparar la Heladera Exhibidora (Fase 1/2)",
+                description=(
+                    f"🔌 **Conectando Circuito Eléctrico** (Cable {self.cables_step + 1}/3)\n\n"
+                    f"¿A qué terminal conectás el **{current_wire}**?\n\n"
+                    f"⚠️ *¡Cuidado con no tocar el terminal equivocado o salta la térmica!*"
+                ),
+                color=discord.Color.gold(),
+            )
+        else:
+            if self.temp < self.target_min:
+                temp_status = "🧊 ¡CONGELADA! (Se van a reventar las botellas de vidrio)"
+                bar_color = "🟦"
+            elif self.target_min <= self.temp <= self.target_max:
+                temp_status = "✨ ¡TEMPERATURA PERFECTA! (Bebidas al punto justo)"
+                bar_color = "🟩"
+            else:
+                temp_status = "🔥 CALIENTE (La birra y la Manaos están tibias)"
+                bar_color = "🟥"
+
+            embed = discord.Embed(
+                title="❄️ Minijuego: Reparar la Heladera Exhibidora (Fase 2/2)",
+                description=(
+                    f"🌡️ **Calibración del Termostato y Gas Refrigerante**\n\n"
+                    f"**Temperatura actual:** `{self.temp}°C` {bar_color}\n"
+                    f"**Rango ideal:** `{self.target_min}°C a {self.target_max}°C` 🎯\n\n"
+                    f"Estado: **{temp_status}**\n\n"
+                    f"Usá los botones para regular la temperatura y dale a **Bloquear Termostato** en el rango ideal."
+                ),
+                color=discord.Color.green() if self.target_min <= self.temp <= self.target_max else discord.Color.blue(),
+            )
+        return embed
+
+    async def on_wrong_cable(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este trabajo no es tuyo! 😅", ephemeral=True)
+            return
+        now = int(time.time())
+        with get_connection() as conn:
+            ensure_user(conn, self.guild_id, self.user_id)
+            conn.execute(
+                "UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?",
+                (now, self.guild_id, self.user_id),
+            )
+        embed = discord.Embed(
+            title="⚡ ¡CORTO CIRCUITO Y FOGONAZO!",
+            description=(
+                f"💥 Conectaste el cable al lugar equivocado, saltó la térmica y salió humo negro del motor de la heladera.\n\n"
+                f"🧔 **El Kiosquero:** *«¡Casi me prendés fuego el boliche, animal! ¡Tomátelas!»*\n\n"
+                f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+            ),
+            color=discord.Color.red(),
+        )
+        self.clear_items()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_correct_cable(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este trabajo no es tuyo! 😅", ephemeral=True)
+            return
+        self.cables_step += 1
+        if self.cables_step < 3:
+            self.setup_phase_1()
+            await interaction.response.edit_message(embed=self.build_embed(), view=self)
+        else:
+            self.phase = 2
+            self.setup_phase_2()
+            await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def adjust_temp(self, interaction: discord.Interaction, delta: int):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este trabajo no es tuyo! 😅", ephemeral=True)
+            return
+        self.temp += delta
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def lock_thermostat(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este trabajo no es tuyo! 😅", ephemeral=True)
+            return
+
+        if self.target_min <= self.temp <= self.target_max:
+            cash = random.randint(700, 1000)
+            xp = random.randint(40, 60)
+            now = int(time.time())
+            with get_connection() as conn:
+                ensure_user(conn, self.guild_id, self.user_id)
+                conn.execute(
+                    "UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?",
+                    (cash, xp, now, self.guild_id, self.user_id),
+                )
+                user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+            restock_kiosk(self.guild_id, 2, 3)
+
+            embed = discord.Embed(
+                title="❄️ ¡HELADERA REPARADA Y CONGELANDO! 🍾",
+                description=(
+                    f"¡Quedó calibrada a **{self.temp}°C**! El motor ronronea y las Manaos están bajo cero.\n\n"
+                    f"💵 **Cobraste:** +{money(cash)} (Changuita Pesada)\n"
+                    f"⭐ **Ganaste:** +{xp} XP\n\n"
+                    f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+                ),
+                color=discord.Color.green(),
+            )
+            self.clear_items()
+            await interaction.response.edit_message(embed=embed, view=self)
+        else:
+            now = int(time.time())
+            with get_connection() as conn:
+                ensure_user(conn, self.guild_id, self.user_id)
+                conn.execute(
+                    "UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?",
+                    (now, self.guild_id, self.user_id),
+                )
+            error_reason = "quedó tibia y se pudrieron los yogures" if self.temp > self.target_max else "se congelaron y reventaron las botellas de vidrio"
+            embed = discord.Embed(
+                title="💥 ¡CALIBRACIÓN FALLIDA!",
+                description=(
+                    f"❌ Bloqueaste el termostato a **{self.temp}°C** (fuera de rango).\n"
+                    f"Como resultado, {error_reason}.\n\n"
+                    f"🧔 **El Kiosquero:** *«¡Sos un desastre técnico! ¡Afuera de acá!»*\n\n"
+                    f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                    f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+                ),
+                color=discord.Color.red(),
+            )
+            self.clear_items()
+            await interaction.response.edit_message(embed=embed, view=self)
+
+
+class BuscaminasDepositoView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.interaction = parent_interaction
+        self.size = 9
+        content_pool = ["🍫", "🥤", "🍪", "🍬", "🧃", "🍾", "🕸️", "🕸️", "🐀"]
+        random.shuffle(content_pool)
+        self.grid_content = content_pool
+        self.revealed = [False] * 9
+        self.opened_count = 0
+        self.accumulated_cash = 0
+        self.accumulated_xp = 0
+        self.game_over = False
+        self.build_grid()
+
+    def build_grid(self):
+        self.clear_items()
+        for idx in range(self.size):
+            if self.revealed[idx] or self.game_over:
+                item = self.grid_content[idx]
+                style = discord.ButtonStyle.danger if item == "🐀" else discord.ButtonStyle.secondary
+                btn = discord.ui.Button(label=item, style=style, disabled=True, row=idx // 3)
+            else:
+                btn = discord.ui.Button(label=f"📦 {idx + 1}", style=discord.ButtonStyle.primary, row=idx // 3)
+                btn.callback = self.make_box_callback(idx)
+            self.add_item(btn)
+
+        if not self.game_over and self.opened_count >= 2:
+            cashout_btn = discord.ui.Button(
+                label=f"🏃 Retirarse y Cobrar ({money(self.accumulated_cash)})",
+                style=discord.ButtonStyle.success,
+                row=3,
+            )
+            cashout_btn.callback = self.on_cashout
+            self.add_item(cashout_btn)
+
+    def make_box_callback(self, idx: int):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user_id:
+                await interaction.response.send_message("¡Este juego no es tuyo! 😅", ephemeral=True)
+                return
+
+            if self.game_over:
+                return
+
+            self.revealed[idx] = True
+            item = self.grid_content[idx]
+
+            if item == "🐀":
+                self.game_over = True
+                now = int(time.time())
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute(
+                        "UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?",
+                        (now, self.guild_id, self.user_id),
+                    )
+
+                self.build_grid()
+                embed = discord.Embed(
+                    title="🐀 ¡SALTÓ LA RATA DEL DEPÓSITO!",
+                    description=(
+                        "😱 Abriste la caja y te saltó una rata gigante a la cara. Saliste corriendo a los gritos y perdiste todo lo acumulado.\n\n"
+                        f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                        f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+                    ),
+                    color=discord.Color.red(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            self.opened_count += 1
+            if item != "🕸️":
+                self.accumulated_cash += random.randint(120, 180)
+                self.accumulated_xp += random.randint(8, 14)
+
+            safe_boxes = sum(1 for x in self.grid_content if x != "🐀")
+            opened_safe = sum(1 for i, r in enumerate(self.revealed) if r and self.grid_content[i] != "🐀")
+            if opened_safe == safe_boxes:
+                await self.on_win_all(interaction)
+                return
+
+            self.build_grid()
+            embed = discord.Embed(
+                title="📦 Buscaminas del Depósito",
+                description=(
+                    f"¡Encontraste: {item}!\n\n"
+                    f"💵 **Acumulado:** `{money(self.accumulated_cash)}`\n"
+                    f"⭐ **XP Acumulada:** `+{self.accumulated_xp} XP`\n\n"
+                    f"📦 Cajas abiertas: `{self.opened_count}/{safe_boxes}`\n"
+                    "*(Abrí más cajas para ganar más o retirate seguro si ya tenés 2 abiertas)*"
+                ),
+                color=discord.Color.gold(),
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+
+        return callback
+
+    async def on_cashout(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este juego no es tuyo! 😅", ephemeral=True)
+            return
+
+        self.game_over = True
+        now = int(time.time())
+        with get_connection() as conn:
+            ensure_user(conn, self.guild_id, self.user_id)
+            conn.execute(
+                "UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?",
+                (self.accumulated_cash, self.accumulated_xp, now, self.guild_id, self.user_id),
+            )
+            user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+        restock_kiosk(self.guild_id, 1, 2)
+        self.build_grid()
+        embed = discord.Embed(
+            title="💼 ¡Te retiraste con la mercadería a salvo!",
+            description=(
+                f"💵 **Cobraste:** +{money(self.accumulated_cash)}\n"
+                f"⭐ **Ganaste:** +{self.accumulated_xp} XP\n\n"
+                f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+            ),
+            color=discord.Color.green(),
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_win_all(self, interaction: discord.Interaction):
+        self.game_over = True
+        bonus_cash = self.accumulated_cash + 250
+        bonus_xp = self.accumulated_xp + 20
+        now = int(time.time())
+        with get_connection() as conn:
+            ensure_user(conn, self.guild_id, self.user_id)
+            conn.execute(
+                "UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?",
+                (bonus_cash, bonus_xp, now, self.guild_id, self.user_id),
+            )
+            user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+        restock_kiosk(self.guild_id, 2, 3)
+        self.build_grid()
+        embed = discord.Embed(
+            title="🏆 ¡DEPÓSITO 100% LIMPIO Y SIN RATAS!",
+            description=(
+                f"¡Abriste todas las cajas seguras sin tocar la rata! ¡Sos un crack total!\n\n"
+                f"💵 **Cobraste con bonus:** +{money(bonus_cash)}\n"
+                f"⭐ **Ganaste con bonus:** +{bonus_xp} XP\n\n"
+                f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+            ),
+            color=discord.Color.green(),
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+
+class BarrerPisoMinigameView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=120)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.interaction = parent_interaction
+        self.size = 9
+        pool = ["🍂", "🧻", "🍂", "🧻", "✨", "✨", "✨", "✨", "🪳"]
+        random.shuffle(pool)
+        self.tiles = pool
+        self.cleaned = [False] * 9
+        self.game_over = False
+        self.build_grid()
+
+    def build_grid(self):
+        self.clear_items()
+        for idx in range(self.size):
+            item = self.tiles[idx]
+            if self.cleaned[idx] or (item == "✨" and not self.game_over):
+                btn = discord.ui.Button(label="✨ Limpio", style=discord.ButtonStyle.secondary, disabled=True, row=idx // 3)
+            elif self.game_over:
+                style = discord.ButtonStyle.danger if item == "🪳" else discord.ButtonStyle.secondary
+                btn = discord.ui.Button(label=item, style=style, disabled=True, row=idx // 3)
+            else:
+                label = "🍂 Hojas" if item == "🍂" else ("🧻 Papel" if item == "🧻" else ("🪳 Cuca" if item == "🪳" else "✨"))
+                btn = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=idx // 3)
+                btn.callback = self.make_callback(idx)
+            self.add_item(btn)
+
+    def make_callback(self, idx: int):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user_id:
+                await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+                return
+            if self.game_over:
+                return
+
+            item = self.tiles[idx]
+            if item == "🪳":
+                self.game_over = True
+                now = int(time.time())
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?", (now, self.guild_id, self.user_id))
+                self.build_grid()
+                embed = discord.Embed(
+                    title="🪳 ¡PISASTE LA CUCARACHA Y VOLÓ A TU CARA!",
+                    description=(
+                        "😱 Te pegaste el susto de tu vida, revoleaste la escoba y tiraste un estante.\n\n"
+                        "🧔 **El Kiosquero:** *«¡Qué escándalo hacés por un bicho! ¡Volá de acá!»*\n\n"
+                        f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                        f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+                    ),
+                    color=discord.Color.red(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            self.cleaned[idx] = True
+            dirty_indices = [i for i, t in enumerate(self.tiles) if t in ("🍂", "🧻")]
+            if all(self.cleaned[i] for i in dirty_indices):
+                self.game_over = True
+                cash = random.randint(150, 300)
+                xp = random.randint(10, 20)
+                now = int(time.time())
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?", (cash, xp, now, self.guild_id, self.user_id))
+                    user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+                self.build_grid()
+                embed = discord.Embed(
+                    title="✨ ¡PISO IMPECABLE Y BARRIDO! 🧹",
+                    description=(
+                        "¡Dejaste el salón de ventas reluciente como un espejo!\n\n"
+                        f"💵 **Cobraste:** +{money(cash)}\n"
+                        f"⭐ **Ganaste:** +{xp} XP\n\n"
+                        f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+                    ),
+                    color=discord.Color.green(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            self.build_grid()
+            embed = discord.Embed(
+                title="🧹 Barrer el piso del salón",
+                description=(
+                    "Hacé clic en todas las casillas con basura (`🍂`, `🧻`) para barrerlas.\n\n"
+                    "⚠️ *¡Cuidado de no tocar la cucaracha `🪳` que anda suelta!*"
+                ),
+                color=discord.Color.gold(),
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+
+        return callback
+
+
+class OrdenarProductosMinigameView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.interaction = parent_interaction
+        self.phase = 1
+        self.sequence = random.sample(PRODUCT_LIST, 4)
+        self.current_step = 0
+        self.game_over = False
+        self.setup_phase_1()
+
+    def setup_phase_1(self):
+        self.clear_items()
+        btn_ready = discord.ui.Button(label="🧠 ¡Ya memoricé el orden, empezar!", style=discord.ButtonStyle.success)
+        btn_ready.callback = self.start_ordering
+        self.add_item(btn_ready)
+
+    def setup_phase_2(self):
+        self.clear_items()
+        shuffled = self.sequence.copy()
+        random.shuffle(shuffled)
+        for p in shuffled:
+            btn = discord.ui.Button(label=p["name"], emoji=p["emoji"], style=discord.ButtonStyle.primary)
+            btn.callback = self.make_product_callback(p["id"])
+            self.add_item(btn)
+
+    def build_embed(self) -> discord.Embed:
+        if self.phase == 1:
+            seq_text = " ➔ ".join([f"{p['emoji']} **{p['name']}**" for p in self.sequence])
+            embed = discord.Embed(
+                title="🍫 Simón Dice de Góndola (Memorización)",
+                description=(
+                    "El kiosquero te pidió acomodar este pedido exacto en la estantería:\n\n"
+                    f"📦 **Secuencia a memorizar:**\n{seq_text}\n\n"
+                    "Cuando tengas clara la secuencia en la cabeza, tocá el botón verde para arrancar."
+                ),
+                color=discord.Color.gold(),
+            )
+        else:
+            placed = " ➔ ".join([f"{self.sequence[i]['emoji']} {self.sequence[i]['name']}" for i in range(self.current_step)])
+            if not placed:
+                placed = "*(Góndola vacía)*"
+            embed = discord.Embed(
+                title="🍫 Simón Dice de Góndola (Acomodando)",
+                description=(
+                    f"Progreso: `{self.current_step}/4` productos colocados.\n\n"
+                    f"🛒 **Colocados:** {placed}\n\n"
+                    "👉 *Tocá el siguiente producto que corresponde en la secuencia.*"
+                ),
+                color=discord.Color.blue(),
+            )
+        return embed
+
+    async def start_ordering(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+            return
+        self.phase = 2
+        self.setup_phase_2()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    def make_product_callback(self, prod_id: str):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user_id:
+                await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+                return
+            if self.game_over:
+                return
+
+            expected = self.sequence[self.current_step]
+            if prod_id != expected["id"]:
+                self.game_over = True
+                now = int(time.time())
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?", (now, self.guild_id, self.user_id))
+                self.clear_items()
+                embed = discord.Embed(
+                    title="💥 ¡MANDASTE CUALQUIERA EN LA GÓNDOLA!",
+                    description=(
+                        f"❌ Pusiste un producto equivocado y desarmaste toda la exhibición.\n\n"
+                        f"🧔 **El Kiosquero:** *«¡Te pedí {expected['name']} y me encajás cualquier cosa! ¡Afuera!»*\n\n"
+                        f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                        f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+                    ),
+                    color=discord.Color.red(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            self.current_step += 1
+            if self.current_step == 4:
+                self.game_over = True
+                cash = random.randint(300, 600)
+                xp = random.randint(20, 35)
+                now = int(time.time())
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?", (cash, xp, now, self.guild_id, self.user_id))
+                    user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+                restock_kiosk(self.guild_id, 1, 2)
+                self.clear_items()
+                embed = discord.Embed(
+                    title="✨ ¡GÓNDOLA PERFECTAMENTE ORDENADA! 🍫",
+                    description=(
+                        "¡Sos un fenómeno de la memoria! Acomodaste los 4 productos en orden exacto.\n\n"
+                        f"💵 **Cobraste:** +{money(cash)}\n"
+                        f"⭐ **Ganaste:** +{xp} XP\n\n"
+                        f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+                    ),
+                    color=discord.Color.green(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            await interaction.response.edit_message(embed=self.build_embed(), view=self)
+        return callback
+
+
+class MoverCajasMinigameView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=120)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.interaction = parent_interaction
+        self.force = 0
+        self.game_over = False
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.clear_items()
+        if not self.game_over:
+            btn_force = discord.ui.Button(label="¡HACER FUERZA! (+25%)", emoji="🏋️", style=discord.ButtonStyle.primary)
+            btn_trap = discord.ui.Button(label="Trabar con el pie", emoji="🦶", style=discord.ButtonStyle.secondary)
+
+            btn_force.callback = self.on_force
+            btn_trap.callback = self.on_trap
+
+            btns = [btn_force, btn_trap]
+            random.shuffle(btns)
+            for b in btns:
+                self.add_item(b)
+
+    def render_bar(self) -> str:
+        total_blocks = 10
+        filled = int((self.force / 100) * total_blocks)
+        bar = "█" * filled + "░" * (total_blocks - filled)
+        return f"[{bar}] {self.force}%"
+
+    def build_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title="🏋️ Minijuego: Mover Cajas Pesadas (Fuerza QTE)",
+            description=(
+                f"📦 **Levantando cajones de bebidas al depósito alto...**\n\n"
+                f"**Potencia de empuje:** `{self.render_bar()}`\n\n"
+                "👉 *Presioná **¡HACER FUERZA!** para llegar al 100% sin aflojar. ¡Cuidado con pisar en falso!*"
+            ),
+            color=discord.Color.gold(),
+        )
+        return embed
+
+    async def on_force(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+            return
+        if self.game_over:
+            return
+
+        self.force += 25
+        if self.force >= 100:
+            self.game_over = True
+            cash = random.randint(600, 1000)
+            xp = random.randint(35, 60)
+            now = int(time.time())
+            with get_connection() as conn:
+                ensure_user(conn, self.guild_id, self.user_id)
+                conn.execute("UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?", (cash, xp, now, self.guild_id, self.user_id))
+                user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+            restock_kiosk(self.guild_id, 2, 3)
+            self.clear_items()
+            embed = discord.Embed(
+                title="💪 ¡CAJONES ACOMODADOS EN LO ALTO! 📦",
+                description=(
+                    f"**Potencia alcanzada:** `[██████████] 100%`\n\n"
+                    "¡Tremendo lomo tenés! Subiste la carga sin que se caiga ni una botella.\n\n"
+                    f"💵 **Cobraste:** +{money(cash)} (Changuita Pesada)\n"
+                    f"⭐ **Ganaste:** +{xp} XP\n\n"
+                    f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+                ),
+                color=discord.Color.green(),
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+            return
+
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def on_trap(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+            return
+        self.game_over = True
+        now = int(time.time())
+        with get_connection() as conn:
+            ensure_user(conn, self.guild_id, self.user_id)
+            conn.execute("UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?", (now, self.guild_id, self.user_id))
+
+        self.clear_items()
+        embed = discord.Embed(
+            title="💥 ¡TE PATINASTE Y SE TE CAYERON 5 CAJONES ENCIMA!",
+            description=(
+                "🦴 Quisiste trabar con el pie, resbalaste en el piso y llovieron botellas.\n\n"
+                "🧔 **El Kiosquero:** *«¡Me rompiste 5 cajones enteros de cerveza! ¡Tomátelas!»*\n\n"
+                f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+            ),
+            color=discord.Color.red(),
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+
+class CobrarCajaMinigameView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.interaction = parent_interaction
+
+        customers = [
+            ("Doña Rosa 👵", "un alfajor Jorgito y una Manaos"),
+            ("Don Carlos 👴", "un atado de puchos y un turrón"),
+            ("El Pibe de la Moto 🛵", "tres Don Satur y un energizante"),
+            ("La Vecina del 3B 👩", "dos chocolates y caramelos"),
+            ("El Tano de la esquina 👨", "una Coca y un paquete de galletitas"),
+        ]
+        cust, items = random.choice(customers)
+        self.customer = cust
+        self.items_desc = items
+
+        costs = [350, 450, 650, 750, 850, 1150, 1250, 1350, 1650, 1750, 2350, 2650, 3150, 3450]
+        self.cost = random.choice(costs)
+        if self.cost < 1000:
+            self.paid = random.choice([1000, 2000])
+        elif self.cost < 2000:
+            self.paid = random.choice([2000, 5000])
+        else:
+            self.paid = 5000
+
+        self.exact_change = self.paid - self.cost
+        self.delivered = 0
+        self.game_over = False
+        self.build_buttons()
+
+    def build_buttons(self):
+        self.clear_items()
+        if not self.game_over:
+            btn_1000 = discord.ui.Button(label="+$1.000", emoji="💵", style=discord.ButtonStyle.primary, row=0)
+            btn_500 = discord.ui.Button(label="+$500", emoji="💵", style=discord.ButtonStyle.primary, row=0)
+            btn_200 = discord.ui.Button(label="+$200", emoji="💵", style=discord.ButtonStyle.primary, row=0)
+            btn_100 = discord.ui.Button(label="+$100", emoji="💵", style=discord.ButtonStyle.primary, row=0)
+            btn_50 = discord.ui.Button(label="+$50", emoji="🪙", style=discord.ButtonStyle.secondary, row=1)
+            btn_reset = discord.ui.Button(label="Borrar ($0)", emoji="🔄", style=discord.ButtonStyle.danger, row=1)
+            btn_confirm = discord.ui.Button(label="Entregar Vuelto", emoji="✅", style=discord.ButtonStyle.success, row=1)
+
+            btn_1000.callback = lambda i: self.add_money(i, 1000)
+            btn_500.callback = lambda i: self.add_money(i, 500)
+            btn_200.callback = lambda i: self.add_money(i, 200)
+            btn_100.callback = lambda i: self.add_money(i, 100)
+            btn_50.callback = lambda i: self.add_money(i, 50)
+            btn_reset.callback = self.reset_money
+            btn_confirm.callback = self.confirm_change
+
+            self.add_item(btn_1000)
+            self.add_item(btn_500)
+            self.add_item(btn_200)
+            self.add_item(btn_100)
+            self.add_item(btn_50)
+            self.add_item(btn_reset)
+            self.add_item(btn_confirm)
+
+    def build_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title="🧮 Minijuego: Cobrar en la Caja Registradora",
+            description=(
+                f"{self.customer} compró **{self.items_desc}**.\n\n"
+                f"🧾 **Total de la compra:** **{money(self.cost)}**\n"
+                f"💵 **Pagó con:** **{money(self.paid)}**\n\n"
+                f"🪙 **Dinero colocado en el mostrador:** **{money(self.delivered)}**\n\n"
+                "💡 *Hacé la cuenta mental del vuelto que le corresponde, armá el dinero con los botones y dale a **Entregar Vuelto**.*"
+            ),
+            color=discord.Color.gold(),
+        )
+        return embed
+
+    async def add_money(self, interaction: discord.Interaction, amount: int):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+            return
+        if self.game_over:
+            return
+        self.delivered += amount
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def reset_money(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+            return
+        if self.game_over:
+            return
+        self.delivered = 0
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def confirm_change(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+            return
+        if self.game_over:
+            return
+
+        self.game_over = True
+        now = int(time.time())
+
+        if self.delivered == self.exact_change:
+            cash = random.randint(300, 600)
+            xp = random.randint(20, 35)
+            with get_connection() as conn:
+                ensure_user(conn, self.guild_id, self.user_id)
+                conn.execute("UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?", (cash, xp, now, self.guild_id, self.user_id))
+                user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+            self.clear_items()
+            embed = discord.Embed(
+                title="✨ ¡VUELTO EXACTO Y CLIENTE FELIZ! 💵",
+                description=(
+                    f"¡Calculaste perfecto! El vuelto exacto era **{money(self.exact_change)}**.\n"
+                    f"{self.customer} te agradece sonriendo y se va contento.\n\n"
+                    f"💵 **Cobraste:** +{money(cash)}\n"
+                    f"⭐ **Ganaste:** +{xp} XP\n\n"
+                    f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+                ),
+                color=discord.Color.green(),
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+        else:
+            with get_connection() as conn:
+                ensure_user(conn, self.guild_id, self.user_id)
+                conn.execute("UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?", (now, self.guild_id, self.user_id))
+
+            self.clear_items()
+            if self.delivered > self.exact_change:
+                reason = f"Le diste **{money(self.delivered)}** cuando el vuelto era **{money(self.exact_change)}**. ¡Le regalaste plata del negocio!"
+            else:
+                reason = f"Le diste **{money(self.delivered)}** cuando el vuelto era **{money(self.exact_change)}**. ¡El cliente te gritó estafador y llamó al dueño!"
+
+            embed = discord.Embed(
+                title="💥 ¡ERROR GRAVE EN LA CAJA!",
+                description=(
+                    f"❌ **Mandaste cualquiera con la cuenta:**\n{reason}\n\n"
+                    "🧔 **El Kiosquero:** *«¡No sabés ni restar, animal! ¡Dejá la caja y andate!»*\n\n"
+                    f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                    f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+                ),
+                color=discord.Color.red(),
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+
+
+class LimpiarVidriosMinigameView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=120)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.interaction = parent_interaction
+        self.step = 0
+        self.cleaned = [False, False, False, False]
+        self.game_over = False
+        self.build_buttons()
+
+    def build_buttons(self):
+        self.clear_items()
+        zones = [
+            ("1. Superior Izquierda", 0, 0),
+            ("2. Superior Derecha", 1, 0),
+            ("3. Inferior Izquierda", 2, 1),
+            ("4. Inferior Derecha", 3, 1),
+        ]
+        for name, idx, row in zones:
+            if self.cleaned[idx]:
+                btn = discord.ui.Button(label=f"✨ {name}", style=discord.ButtonStyle.secondary, disabled=True, row=row)
+            elif self.game_over:
+                btn = discord.ui.Button(label=f"❌ {name}", style=discord.ButtonStyle.danger, disabled=True, row=row)
+            else:
+                btn = discord.ui.Button(label=f"🧼 {name}", style=discord.ButtonStyle.primary, row=row)
+                btn.callback = self.make_zone_callback(idx)
+            self.add_item(btn)
+
+    def build_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title="🪟 Minijuego: Limpiar la Vidriera con Secador",
+            description=(
+                "El ventanal está enjabonado. Tenés que pasar la espátula secavidrios **en orden (1 ➔ 2 ➔ 3 ➔ 4)** de arriba hacia abajo.\n\n"
+                f"Progreso: `{self.step}/4` zonas secadas.\n\n"
+                "⚠️ *¡Si saltás de zona o pasás en seco, rayás todo el vidrio!*"
+            ),
+            color=discord.Color.gold(),
+        )
+        return embed
+
+    def make_zone_callback(self, idx: int):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user_id:
+                await interaction.response.send_message("¡Este laburo no es tuyo! 😅", ephemeral=True)
+                return
+            if self.game_over:
+                return
+
+            if idx != self.step:
+                self.game_over = True
+                now = int(time.time())
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET last_work=? WHERE guild_id=? AND user_id=?", (now, self.guild_id, self.user_id))
+
+                self.build_buttons()
+                embed = discord.Embed(
+                    title="💥 ¡RAYASTE TODO EL VENTANAL FRONTAL!",
+                    description=(
+                        f"❌ Pasaste la espátula en la zona {idx + 1} fuera de orden y se secó el jabón en el resto.\n\n"
+                        "🧔 **El Kiosquero:** *«¡Dejaste el vidrio rayado y grasiento! ¡Tomátelas!»*\n\n"
+                        f"💸 **Cobro:** $0 • ⭐ **XP:** 0\n"
+                        f"⏳ Podés volver a laburar en **{CONFIG['changuita_cooldown_minutes']} minutos**."
+                    ),
+                    color=discord.Color.red(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            self.cleaned[idx] = True
+            self.step += 1
+
+            if self.step == 4:
+                self.game_over = True
+                cash = random.randint(300, 600)
+                xp = random.randint(20, 35)
+                now = int(time.time())
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET money=money+?, xp=xp+?, last_work=? WHERE guild_id=? AND user_id=?", (cash, xp, now, self.guild_id, self.user_id))
+                    user = conn.execute("SELECT money, xp FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+                self.build_buttons()
+                embed = discord.Embed(
+                    title="✨ ¡VIDRIERA IMPECABLE Y TRANSPARENTE! 🪟",
+                    description=(
+                        "¡Pasaste el secador con técnica perfecta! El vidrio parece invisible.\n\n"
+                        f"💵 **Cobraste:** +{money(cash)}\n"
+                        f"⭐ **Ganaste:** +{xp} XP\n\n"
+                        f"💼 Billetera: **{money(user['money'])}** | ⭐ Total: **{user['xp']} XP**"
+                    ),
+                    color=discord.Color.green(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            self.build_buttons()
+            await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+        return callback
+
+
 class ChanguitaSelect(discord.ui.Select):
     def __init__(self, sample_jobs: list[dict]):
         options = []
         for job in sample_jobs:
             tier_cfg = CONFIG["changuita_tiers"][job["tier"]]
+            badge = " 🎮" if job.get("is_minigame") else ""
             options.append(
                 discord.SelectOption(
-                    label=job["name"],
+                    label=f"{job['name']}{badge}"[:100],
                     value=job["id"],
                     emoji=job["emoji"],
-                    description=f"{tier_cfg['name']} • {money(tier_cfg['money_min'])}-{money(tier_cfg['money_max'])}",
+                    description=f"{tier_cfg['name']} • {money(tier_cfg['money_min'])}-{money(tier_cfg['money_max'])}"[:100],
                 )
             )
         super().__init__(
             placeholder="Elegí una changuita para laburar...",
             min_values=1,
             max_values=1,
-            options=options,
+            options=options[:25],
         )
 
     async def callback(self, interaction: discord.Interaction):
-        job = CHANGUITAS_MAP[self.values[0]]
+        job_id = self.values[0]
+        job = CHANGUITAS_MAP.get(job_id)
+        if not job:
+            await interaction.response.send_message("❌ Changuita no encontrada.", ephemeral=True)
+            return
+
+        if job.get("is_minigame") == "atajar":
+            view = AtajarManaosMinigameView(interaction.user.id, interaction.guild_id, interaction)
+            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+            return
+        elif job.get("is_minigame") == "heladera":
+            view = RepararHeladeraMinigameView(interaction.user.id, interaction.guild_id, interaction)
+            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+            return
+        elif job.get("is_minigame") == "deposito":
+            view = BuscaminasDepositoView(interaction.user.id, interaction.guild_id, interaction)
+            embed = discord.Embed(
+                title="📦 Buscaminas del Depósito",
+                description=(
+                    "Elegí una caja para abrir:\n\n"
+                    "💵 **Acumulado:** `$0`  •  ⭐ **XP Acumulada:** `+0 XP`\n\n"
+                    "⚠️ *Hay 1 rata escondida entre las 9 cajas. ¡No la toques!*"
+                ),
+                color=discord.Color.gold(),
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            return
+        elif job.get("is_minigame") == "barrer":
+            view = BarrerPisoMinigameView(interaction.user.id, interaction.guild_id, interaction)
+            embed = discord.Embed(
+                title="🧹 Barrer el piso del salón",
+                description=(
+                    "Hacé clic en todas las casillas con basura (`🍂`, `🧻`) para barrerlas.\n\n"
+                    "⚠️ *¡Cuidado de no tocar la cucaracha `🪳` que anda suelta!*"
+                ),
+                color=discord.Color.gold(),
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            return
+        elif job.get("is_minigame") == "ordenar":
+            view = OrdenarProductosMinigameView(interaction.user.id, interaction.guild_id, interaction)
+            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+            return
+        elif job.get("is_minigame") == "cajas":
+            view = MoverCajasMinigameView(interaction.user.id, interaction.guild_id, interaction)
+            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+            return
+        elif job.get("is_minigame") == "caja":
+            view = CobrarCajaMinigameView(interaction.user.id, interaction.guild_id, interaction)
+            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+            return
+        elif job.get("is_minigame") == "vidrios":
+            view = LimpiarVidriosMinigameView(interaction.user.id, interaction.guild_id, interaction)
+            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+            return
+
         step_1 = job["steps"][0]
 
         embed = discord.Embed(
@@ -1919,26 +3097,66 @@ class PersistentKioskView(discord.ui.View):
 
 # ---------- GESTIÓN DEL MENSAJE FIJO Y JORNADAS ----------
 
-async def update_kiosk_fixed_message(guild: discord.Guild) -> None:
+async def get_or_create_kiosk_channel(guild: discord.Guild) -> discord.TextChannel | None:
+    """Busca o crea automáticamente el canal oficial del Kiosquito."""
     channel_id_raw = get_setting(guild.id, "kiosk_channel_id", "0")
     try:
         channel_id = int(channel_id_raw)
     except ValueError:
-        return
+        channel_id = 0
 
-    if not channel_id:
-        return
+    # 1. Si ya hay un canal configurado y sigue existiendo, usar ese
+    if channel_id:
+        ch = guild.get_channel(channel_id)
+        if not ch:
+            try:
+                ch = await guild.fetch_channel(channel_id)
+            except Exception:
+                ch = None
+        if ch and isinstance(ch, discord.TextChannel):
+            return ch
 
-    channel = guild.get_channel(channel_id)
+    # 2. Buscar si ya existe algún canal con nombre de kiosquito
+    channel_names = ["el-kiosquito-de-lemon", "kiosquito-de-lemon", "el-kiosquito", "kiosquito"]
+    for ch in guild.text_channels:
+        if ch.name.lower() in channel_names or "kiosquito" in ch.name.lower():
+            set_setting(guild.id, "kiosk_channel_id", str(ch.id))
+            return ch
+
+    # 3. Si no existe, crearlo automáticamente
+    try:
+        new_ch = await guild.create_text_channel(
+            name="el-kiosquito-de-lemon",
+            topic="🏪 Canal oficial de compras, changuitas y economía de El Kiosquito de Lemon.",
+        )
+        set_setting(guild.id, "kiosk_channel_id", str(new_ch.id))
+        set_setting(guild.id, "kiosk_message_id", "0")
+        print(f"✅ Canal #el-kiosquito-de-lemon creado automáticamente en '{guild.name}' ({guild.id})")
+        return new_ch
+    except discord.Forbidden:
+        print(f"⚠️ No se pudo crear el canal en '{guild.name}': falta permiso 'Manage Channels'.")
+    except Exception as e:
+        print(f"⚠️ Error al crear canal en '{guild.name}': {e}")
+
+    # 4. Si no pudo crear, devolver el canal del sistema o el primer canal de texto con permisos
+    if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
+        return guild.system_channel
+
+    for ch in guild.text_channels:
+        if ch.permissions_for(guild.me).send_messages:
+            return ch
+
+    return None
+
+
+async def update_kiosk_fixed_message(guild: discord.Guild, repost: bool = False) -> None:
+    channel = await get_or_create_kiosk_channel(guild)
     if not channel:
-        try:
-            channel = await guild.fetch_channel(channel_id)
-        except Exception:
-            return
+        return
 
     open_now = is_open(guild_id=guild.id)
     embed = kiosk_open_embed(guild.id) if open_now else kiosk_closed_embed(guild.id)
-    view = PersistentKioskView()
+    view = PersistentKioskView() if open_now else None
 
     message_id_raw = get_setting(guild.id, "kiosk_message_id", "0")
     try:
@@ -1946,29 +3164,45 @@ async def update_kiosk_fixed_message(guild: discord.Guild) -> None:
     except ValueError:
         message_id = 0
 
-    message = None
+    old_message = None
     if message_id:
         try:
-            message = await channel.fetch_message(message_id)
+            old_message = await channel.fetch_message(message_id)
         except (discord.NotFound, discord.HTTPException):
-            message = None
+            old_message = None
 
-    if message:
+    if repost:
+        # Borrar el mensaje anterior para que el nuevo quede al final del chat y sea visible
+        if old_message:
+            try:
+                await old_message.delete()
+            except Exception as e:
+                print(f"Aviso al borrar mensaje anterior del kiosquito: {e}")
+
         try:
-            await message.edit(embed=embed, view=view)
-            return
-        except discord.HTTPException:
-            pass
+            new_msg = await channel.send(embed=embed, view=view)
+            set_setting(guild.id, "kiosk_message_id", str(new_msg.id))
+        except Exception as e:
+            print(f"Error enviando nuevo mensaje de kiosquito en guild {guild.id}: {e}")
+    else:
+        # Actualizar en el lugar si el mensaje existe
+        if old_message:
+            try:
+                await old_message.edit(embed=embed, view=view)
+                return
+            except discord.HTTPException:
+                pass
 
-    try:
-        new_msg = await channel.send(embed=embed, view=view)
-        set_setting(guild.id, "kiosk_message_id", str(new_msg.id))
-    except Exception as e:
-        print(f"Error enviando mensaje fijo en guild {guild.id}: {e}")
+        # Si no existía o falló la edición, enviar uno nuevo
+        try:
+            new_msg = await channel.send(embed=embed, view=view)
+            set_setting(guild.id, "kiosk_message_id", str(new_msg.id))
+        except Exception as e:
+            print(f"Error enviando mensaje fijo en guild {guild.id}: {e}")
 
 
 async def on_shift_opened(guild: discord.Guild):
-    """Inicia una nueva jornada al abrirse el kiosquito, setea stock inicial y tira ofertas."""
+    """Inicia una nueva jornada al abrirse el kiosquito, setea stock inicial, tira ofertas y publica el panel actualizado."""
     new_shift_id = int(time.time())
     set_setting(guild.id, "current_shift_id", str(new_shift_id))
     set_setting(guild.id, "last_open_state", "1")
@@ -1977,18 +3211,19 @@ async def on_shift_opened(guild: discord.Guild):
     init_shift_stock(guild.id)
     roll_shift_offers(guild.id)
 
-    await update_kiosk_fixed_message(guild)
+    # Publicar el mensaje de apertura al fondo del canal borrando el anterior
+    await update_kiosk_fixed_message(guild, repost=True)
 
 
 async def on_shift_closed(guild: discord.Guild):
-    """Cierra la jornada, limpia mensajes de consumo de la jornada y actualiza el mensaje fijo con el resumen."""
-    current_shift_id = get_current_shift_id(guild.id)
-
-    # 1. Limpiar todos los mensajes públicos de consumo de esta jornada
-    records = get_shift_consumption_messages(guild.id, current_shift_id)
+    """Cierra la jornada, limpia mensajes de consumo de la jornada y publica el mensaje de cierre con el resumen."""
+    # 1. Limpiar todos los mensajes públicos de consumo de la jornada
+    records = get_guild_consumption_messages(guild.id)
     for row in records:
         try:
             ch = guild.get_channel(row["channel_id"])
+            if not ch:
+                ch = await guild.fetch_channel(row["channel_id"])
             if ch:
                 msg = await ch.fetch_message(row["message_id"])
                 if msg:
@@ -1996,7 +3231,7 @@ async def on_shift_closed(guild: discord.Guild):
         except Exception:
             pass
 
-    delete_shift_consumption_records(guild.id, current_shift_id)
+    delete_all_consumption_records(guild.id)
 
     # 2. Resetear ofertas activas
     set_setting(guild.id, "shift_offers", "{}")
@@ -2004,8 +3239,8 @@ async def on_shift_closed(guild: discord.Guild):
     # 3. Marcar estado cerrado
     set_setting(guild.id, "last_open_state", "0")
 
-    # 4. Actualizar mensaje fijo a cerrado con el resumen de jornada
-    await update_kiosk_fixed_message(guild)
+    # 4. Publicar nuevo mensaje de cierre con el resumen borrando el anterior
+    await update_kiosk_fixed_message(guild, repost=True)
 
 
 # ---------- CLASE PRINCIPAL DEL BOT ----------
@@ -2040,11 +3275,30 @@ async def on_ready():
     print(f"Estado por horario: {'ABIERTO' if is_open() else 'CERRADO'}")
     print("=" * 52)
 
+    now = datetime.now(TZ)
     for guild in bot.guilds:
-        await update_kiosk_fixed_message(guild)
+        currently_open = is_open(now, guild.id)
+        last_state = get_setting(guild.id, "last_open_state", "-1")
+
+        if last_state == "-1":
+            set_setting(guild.id, "last_open_state", "1" if currently_open else "0")
+            await update_kiosk_fixed_message(guild, repost=True)
+        elif currently_open and last_state == "0":
+            await on_shift_opened(guild)
+        elif not currently_open and last_state == "1":
+            await on_shift_closed(guild)
+        else:
+            await update_kiosk_fixed_message(guild, repost=False)
 
     if not presence_loop.is_running():
         presence_loop.start()
+
+
+@bot.event
+async def on_guild_join(guild: discord.Guild):
+    print(f"🎉 El bot se ha unido a: {guild.name} ({guild.id})")
+    # Crear/detectar canal automáticamente y publicar el panel
+    await update_kiosk_fixed_message(guild, repost=True)
 
 
 @bot.event
@@ -2075,7 +3329,7 @@ async def presence_loop():
 
         if last_state == "-1":
             set_setting(guild.id, "last_open_state", "1" if currently_open else "0")
-            await update_kiosk_fixed_message(guild)
+            await update_kiosk_fixed_message(guild, repost=True)
         elif currently_open and last_state == "0":
             await on_shift_opened(guild)
         elif not currently_open and last_state == "1":
@@ -2083,7 +3337,7 @@ async def presence_loop():
         elif currently_open and now.minute % 30 == 0:
             # Reposición periódica de stock cada 30 min mientras está abierto
             restock_kiosk(guild.id)
-            await update_kiosk_fixed_message(guild)
+            await update_kiosk_fixed_message(guild, repost=False)
 
     manually_open = any(
         manual_open_status(guild.id)[0]
@@ -2107,21 +3361,34 @@ async def before_presence():
 
 @bot.tree.command(name="setup", description="[Admin] Configurar el canal propio del Kiosquito de Lemon.")
 @app_commands.checks.has_permissions(manage_guild=True)
-@app_commands.describe(canal="Canal donde estará el mensaje fijo del kiosquito.")
+@app_commands.describe(canal="Canal donde estará el mensaje fijo (opcional, por defecto crea o usa #el-kiosquito-de-lemon).")
 @app_commands.guild_only()
 async def setup(
     interaction: discord.Interaction,
     canal: discord.TextChannel | None = None,
 ):
-    target_channel = canal or interaction.channel
+    target_channel = canal or (await get_or_create_kiosk_channel(interaction.guild)) or interaction.channel
+    old_channel_id_raw = get_setting(interaction.guild_id, "kiosk_channel_id", "0")
+    old_msg_id_raw = get_setting(interaction.guild_id, "kiosk_message_id", "0")
+
+    if str(target_channel.id) != old_channel_id_raw:
+        try:
+            old_ch = interaction.guild.get_channel(int(old_channel_id_raw))
+            if old_ch:
+                old_msg = await old_ch.fetch_message(int(old_msg_id_raw))
+                if old_msg:
+                    await old_msg.delete()
+        except Exception:
+            pass
+
     set_setting(interaction.guild_id, "kiosk_channel_id", str(target_channel.id))
     set_setting(interaction.guild_id, "kiosk_message_id", "0")
 
-    await update_kiosk_fixed_message(interaction.guild)
+    await update_kiosk_fixed_message(interaction.guild, repost=True)
 
     await interaction.response.send_message(
         f"✅ **Kiosquito configurado exitosamente** en {target_channel.mention}.\n"
-        f"Se ha publicado y fijado el panel interactivo del Kiosquito.",
+        f"Se ha publicado el panel interactivo del Kiosquito.",
         ephemeral=True,
     )
     asyncio.create_task(auto_delete_interaction(interaction, 180))
@@ -2698,15 +3965,24 @@ async def ayuda(interaction: discord.Interaction):
 
 @bot.tree.command(name="admin_abrir", description="[Admin] Abrir el kiosquito manualmente.")
 @app_commands.checks.has_permissions(manage_guild=True)
-@app_commands.describe(minutos="Minutos para mantener abierto. Dejá vacío para abrir indefinidamente.")
+@app_commands.describe(minutos="Minutos para mantener abierto. Dejá vacío para abrir normalmente.")
 @app_commands.guild_only()
 async def admin_abrir(
     interaction: discord.Interaction,
     minutos: app_commands.Range[int, 1, 720] | None = None,
 ):
+    now = datetime.now(TZ)
+    # Limpiar cualquier cierre forzado previo
+    set_setting(interaction.guild_id, "force_closed_period", "")
+
+    current_period = get_current_schedule_period(now)
     if minutos is None:
-        set_setting(interaction.guild_id, "manual_open_until", "-1")
-        detalle = "hasta que un admin use `/admin_cerrar`"
+        if current_period:
+            set_setting(interaction.guild_id, "manual_open_until", "0")
+            detalle = "por horario comercial regular"
+        else:
+            set_setting(interaction.guild_id, "manual_open_until", "-1")
+            detalle = "hasta que un admin use `/admin_cerrar` o llegue el próximo horario"
     else:
         until = int(time.time()) + (minutos * 60)
         set_setting(interaction.guild_id, "manual_open_until", str(until))
@@ -2715,29 +3991,39 @@ async def admin_abrir(
     await on_shift_opened(interaction.guild)
 
     await interaction.response.send_message(
-        f"🔓 **Kiosquito abierto manualmente** {detalle}.\n"
+        f"🔓 **Kiosquito abierto exitosamente** ({detalle}).\n"
         f"Ya se encuentran habilitadas las compras y changuitas.",
         ephemeral=True,
     )
     asyncio.create_task(auto_delete_interaction(interaction, 180))
 
 
-@bot.tree.command(name="admin_cerrar", description="[Admin] Cancelar apertura manual y cerrar la jornada.")
+@bot.tree.command(name="admin_cerrar", description="[Admin] Cerrar el kiosquito forzosamente.")
 @app_commands.checks.has_permissions(manage_guild=True)
 @app_commands.guild_only()
 async def admin_cerrar(interaction: discord.Interaction):
-    manual_open, _ = manual_open_status(interaction.guild_id)
+    now = datetime.now(TZ)
+    was_open = is_open(now, guild_id=interaction.guild_id)
+
+    # Cancelar apertura manual si hubiera
     set_setting(interaction.guild_id, "manual_open_until", "0")
 
-    if is_open(guild_id=interaction.guild_id):
-        estado = "✅ Apertura manual cancelada. El kiosquito sigue abierto por horario regular."
-        await update_kiosk_fixed_message(interaction.guild)
+    # Si estamos dentro de un período programado, marcar este período como cerrado forzosamente
+    current_period = get_current_schedule_period(now)
+    if current_period:
+        set_setting(interaction.guild_id, "force_closed_period", current_period)
     else:
-        estado = f"🔒 Kiosquito cerrado. Se ha generado el resumen de la jornada. Próxima apertura: **{next_opening()}**."
-        await on_shift_closed(interaction.guild)
+        set_setting(interaction.guild_id, "force_closed_period", "")
 
-    if not manual_open:
-        estado = "ℹ️ No había apertura manual activa.\n" + estado
+    if was_open:
+        await on_shift_closed(interaction.guild)
+        estado = (
+            f"🔒 **Kiosquito cerrado manualmente por un administrador.**\n"
+            f"Se ha publicado el resumen de la jornada.\n"
+            f"Volverá a abrir automáticamente en el próximo horario: **{next_opening(now)}** (o con `/admin_abrir`)."
+        )
+    else:
+        estado = f"ℹ️ El kiosquito ya se encuentra cerrado. Próxima apertura: **{next_opening(now)}**."
 
     await interaction.response.send_message(estado, ephemeral=True)
     asyncio.create_task(auto_delete_interaction(interaction, 180))
@@ -2749,7 +4035,7 @@ async def admin_cerrar(interaction: discord.Interaction):
 @app_commands.guild_only()
 async def admin_reponer(interaction: discord.Interaction, cantidad: app_commands.Range[int, 1, 20] = 3):
     restock_kiosk(interaction.guild_id, cantidad, cantidad)
-    await update_kiosk_fixed_message(interaction.guild)
+    await update_kiosk_fixed_message(interaction.guild, repost=False)
     await interaction.response.send_message(
         f"📦 Se han repuesto **+{cantidad} unidades** a todos los productos del mostrador.",
         ephemeral=True,
