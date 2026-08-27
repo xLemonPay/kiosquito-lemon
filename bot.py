@@ -572,7 +572,9 @@ async def auto_delete_interaction(interaction: discord.Interaction, delay: int =
 
 def get_connection() -> sqlite3.Connection:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout = 30000;")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -741,9 +743,14 @@ def get_all_kiosk_stock(guild_id: int) -> dict[str, int]:
         ).fetchall()
         for r in rows:
             stock_map[r["product_id"]] = int(r["stock"])
-    for pid in PRODUCTS:
-        if pid not in stock_map:
-            stock_map[pid] = get_kiosk_stock(guild_id, pid)
+        for pid in PRODUCTS:
+            if pid not in stock_map:
+                init_val = random.randint(CONFIG.get("stock_min_initial", 3), CONFIG.get("stock_max_initial", 7))
+                conn.execute(
+                    "INSERT OR REPLACE INTO kiosk_stock (guild_id, product_id, stock) VALUES (?, ?, ?)",
+                    (guild_id, pid, init_val),
+                )
+                stock_map[pid] = init_val
     return stock_map
 
 
@@ -763,13 +770,20 @@ def restock_kiosk(guild_id: int, amount_min: int = 1, amount_max: int = 3) -> No
     max_cap = CONFIG.get("stock_max_initial", 7) + 2
     with get_connection() as conn:
         for pid in PRODUCTS:
-            current = get_kiosk_stock(guild_id, pid)
+            row = conn.execute(
+                "SELECT stock FROM kiosk_stock WHERE guild_id=? AND product_id=?",
+                (guild_id, pid),
+            ).fetchone()
+            if row is not None:
+                current = int(row["stock"])
+            else:
+                current = random.randint(CONFIG.get("stock_min_initial", 3), CONFIG.get("stock_max_initial", 7))
             if current < max_cap:
                 add_qty = random.randint(amount_min, amount_max)
                 new_stock = min(max_cap, current + add_qty)
                 conn.execute(
-                    "UPDATE kiosk_stock SET stock=? WHERE guild_id=? AND product_id=?",
-                    (new_stock, guild_id, pid),
+                    "INSERT OR REPLACE INTO kiosk_stock (guild_id, product_id, stock) VALUES (?, ?, ?)",
+                    (guild_id, pid, new_stock),
                 )
 
 
