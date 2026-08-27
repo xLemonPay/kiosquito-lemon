@@ -910,6 +910,21 @@ def get_guild_consumption_messages(guild_id: int):
         ).fetchall()
 
 
+async def notify_fired(interaction: discord.Interaction, fail_reason: str) -> None:
+    """Envía un anuncio público en el chat cuando rajan a alguien del laburo."""
+    if not interaction.channel:
+        return
+    try:
+        clean_reason = fail_reason.strip()
+        msg = await interaction.channel.send(
+            f"📢 **¡A {interaction.user.mention} lo rajaron del laburo!** 💥\n"
+            f"> 🤦‍♂️ *¿Qué hizo?* {clean_reason}"
+        )
+        record_consumption_message(interaction.guild_id, interaction.channel_id, msg.id)
+    except Exception as e:
+        print(f"Error al enviar aviso de despido en el chat: {e}")
+
+
 def delete_shift_consumption_records(guild_id: int, shift_id: int) -> None:
     with get_connection() as conn:
         conn.execute(
@@ -1418,6 +1433,7 @@ class ChanguitaWorkView(discord.ui.View):
         )
         self.clear_items()
         await interaction.response.edit_message(embed=embed, view=self)
+        await notify_fired(interaction, fail_msg)
 
     async def on_correct(self, interaction: discord.Interaction):
         if interaction.user.id != self.user_id:
@@ -1640,6 +1656,7 @@ class AtajarManaosMinigameView(discord.ui.View):
         )
         self.clear_items()
         await interaction.response.edit_message(embed=embed, view=self)
+        await notify_fired(interaction, "¡No pudo atajar las botellas de Manaos que caían del camión y se reventaron contra el piso!")
 
 
 class RepararHeladeraMinigameView(discord.ui.View):
@@ -1762,6 +1779,7 @@ class RepararHeladeraMinigameView(discord.ui.View):
         )
         self.clear_items()
         await interaction.response.edit_message(embed=embed, view=self)
+        await notify_fired(interaction, "¡Conectó un cable al lugar equivocado, hizo saltar la térmica y casi prende fuego la heladera!")
 
     async def on_correct_cable(self, interaction: discord.Interaction):
         if interaction.user.id != self.user_id:
@@ -1836,6 +1854,7 @@ class RepararHeladeraMinigameView(discord.ui.View):
             )
             self.clear_items()
             await interaction.response.edit_message(embed=embed, view=self)
+            await notify_fired(interaction, f"¡Bloqueó el termostato a {self.temp}°C ({error_reason})!")
 
 
 class BuscaminasDepositoView(discord.ui.View):
@@ -1909,6 +1928,7 @@ class BuscaminasDepositoView(discord.ui.View):
                     color=discord.Color.red(),
                 )
                 await interaction.response.edit_message(embed=embed, view=self)
+                await notify_fired(interaction, "¡Abrió una caja en el depósito, le saltó una rata gigante a la cara y salió corriendo a los gritos!")
                 return
 
             self.opened_count += 1
@@ -2050,6 +2070,7 @@ class BarrerPisoMinigameView(discord.ui.View):
                     color=discord.Color.red(),
                 )
                 await interaction.response.edit_message(embed=embed, view=self)
+                await notify_fired(interaction, "¡Pisó una cucaracha mientras barría el salón, se asustó, revoleó la escoba y tiró un estante de golosinas!")
                 return
 
             self.cleaned[idx] = True
@@ -2181,6 +2202,7 @@ class OrdenarProductosMinigameView(discord.ui.View):
                     color=discord.Color.red(),
                 )
                 await interaction.response.edit_message(embed=embed, view=self)
+                await notify_fired(interaction, f"¡Puso mercadería equivocada en la góndola (se le pidió {expected['name']}) y desarmó toda la exhibición!")
                 return
 
             self.current_step += 1
@@ -2314,6 +2336,7 @@ class MoverCajasMinigameView(discord.ui.View):
             color=discord.Color.red(),
         )
         await interaction.response.edit_message(embed=embed, view=self)
+        await notify_fired(interaction, "¡Quiso trabar una columna de cajones de cerveza con el pie, resbaló en el piso y se le cayeron 5 cajones encima!")
 
 
 class CobrarCajaMinigameView(discord.ui.View):
@@ -2446,8 +2469,10 @@ class CobrarCajaMinigameView(discord.ui.View):
             self.clear_items()
             if self.delivered > self.exact_change:
                 reason = f"Le diste **{money(self.delivered)}** cuando el vuelto era **{money(self.exact_change)}**. ¡Le regalaste plata del negocio!"
+                fail_public = f"¡Le dio {money(self.delivered)} a {self.customer} cuando el vuelto era {money(self.exact_change)} (le regaló plata del negocio)!"
             else:
                 reason = f"Le diste **{money(self.delivered)}** cuando el vuelto era **{money(self.exact_change)}**. ¡El cliente te gritó estafador y llamó al dueño!"
+                fail_public = f"¡Le dio {money(self.delivered)} a {self.customer} cuando el vuelto era {money(self.exact_change)} y el cliente le gritó estafador!"
 
             embed = discord.Embed(
                 title="💥 ¡ERROR GRAVE EN LA CAJA!",
@@ -2460,6 +2485,7 @@ class CobrarCajaMinigameView(discord.ui.View):
                 color=discord.Color.red(),
             )
             await interaction.response.edit_message(embed=embed, view=self)
+            await notify_fired(interaction, fail_public)
 
 
 class LimpiarVidriosMinigameView(discord.ui.View):
@@ -2530,6 +2556,7 @@ class LimpiarVidriosMinigameView(discord.ui.View):
                     color=discord.Color.red(),
                 )
                 await interaction.response.edit_message(embed=embed, view=self)
+                await notify_fired(interaction, f"¡Pasó la espátula en la zona {idx + 1} fuera de orden y rayó todo el ventanal frontal del kiosco!")
                 return
 
             self.cleaned[idx] = True
