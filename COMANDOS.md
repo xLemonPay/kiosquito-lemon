@@ -32,6 +32,13 @@
     - Ordenar el depósito, Acomodar cajones de bebidas, Limpiar la heladera, Limpieza profunda del depósito.
   - ⚠️ *¡Si te equivocás en un paso o juego, te rajan del laburo sin un mango y con 30 min de sanción!*
 
+## 🎰 Lotería y Azar
+- `/raspadita` — Jugar a la Raspadita del Kiosquito en una grilla interactiva 3×3. Costo: **$1.000** ($750 para Suscriptores y Boosters).
+  - 🍋 **`🍋 🍋 🍋` (2%):** ¡POZO ACUMULADO DEL SERVIDOR! (Arranca en $10.000 y acumula +$400 de cada tirada).
+  - 💎 **`💎 💎 💎` (8%):** Ganás **$3.500** en efectivo.
+  - 🍫 **`🍫 🍫 🍫` (12%):** Ganás **$1.500** + 1 Alfajor Jorgito a tu mochila.
+  - ❌ **Sin Premio (78%):** Se suman **+$400** al Pozo Acumulado.
+
 ## 💵 Economía y Progresión
 - `/perfil [usuario]` — Saldo en billetera, XP acumulada, deuda y barra de progreso del fiado.
 - `/saldo` — Resumen rápido de dinero y deuda.

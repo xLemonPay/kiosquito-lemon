@@ -942,6 +942,52 @@ def delete_all_consumption_records(guild_id: int) -> None:
         )
 
 
+def get_raspadita_jackpot(guild_id: int) -> int:
+    raw = get_setting(guild_id, "raspadita_jackpot", "10000")
+    try:
+        val = int(raw)
+        return max(10000, val)
+    except ValueError:
+        return 10000
+
+
+def add_raspadita_jackpot(guild_id: int, amount: int = 400) -> int:
+    current = get_raspadita_jackpot(guild_id)
+    new_val = current + amount
+    set_setting(guild_id, "raspadita_jackpot", str(new_val))
+    return new_val
+
+
+def reset_raspadita_jackpot(guild_id: int) -> int:
+    set_setting(guild_id, "raspadita_jackpot", "10000")
+    return 10000
+
+
+def is_subscriber(member: discord.Member | discord.User) -> bool:
+    if not isinstance(member, discord.Member):
+        return False
+    if member.premium_since is not None:
+        return True
+    for role in member.roles:
+        rname = role.name.lower()
+        if "sub tier" in rname or "subscriber" in rname or "suscriptor" in rname or "booster" in rname or rname.startswith("sub"):
+            return True
+    return False
+
+
+def add_inventory_item(guild_id: int, user_id: int, product_id: str, quantity: int = 1) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO inventory (guild_id, user_id, product_id, quantity)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(guild_id, user_id, product_id)
+            DO UPDATE SET quantity=quantity+excluded.quantity
+            """,
+            (guild_id, user_id, product_id, quantity),
+        )
+
+
 def manual_open_status(guild_id: int) -> tuple[bool, int | None]:
     raw = get_setting(guild_id, "manual_open_until", "0")
     try:
@@ -2593,6 +2639,267 @@ class LimpiarVidriosMinigameView(discord.ui.View):
         return callback
 
 
+class RaspaditaGameView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, is_sub: bool, cost: int, parent_interaction: discord.Interaction):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.is_sub = is_sub
+        self.cost = cost
+        self.parent_interaction = parent_interaction
+        self.revealed_indices = []
+        self.game_over = False
+
+        # Probabilidades reducidas:
+        # 2% -> Pozo Acumulado (🍋)
+        # 8% -> Diamantes $3.500 (💎)
+        # 12% -> Golosinas $1.500 + Alfajor (🍫)
+        # 78% -> Sin premio
+        roll = random.random()
+        if roll < 0.02:
+            target = "🍋"
+        elif roll < 0.10:
+            target = "💎"
+        elif roll < 0.22:
+            target = "🍫"
+        else:
+            target = None
+
+        if target:
+            board = [target, target, target]
+            other_pool = [x for x in ["🍋", "💎", "🍫", "💩", "🍂", "🧻", "🪙"] if x != target]
+            extras = []
+            for sym in other_pool:
+                extras.extend([sym, sym])
+            random.shuffle(extras)
+            board.extend(extras[:6])
+        else:
+            symbols = ["🍋", "💎", "🍫", "💩", "🍂", "🧻", "🪙"]
+            board = []
+            for s in symbols:
+                board.extend([s, s])
+            random.shuffle(board)
+            board = board[:9]
+
+        random.shuffle(board)
+        self.board = board
+        self.build_grid()
+
+    def build_grid(self):
+        self.clear_items()
+        for idx in range(9):
+            row = idx // 3
+            if idx in self.revealed_indices or self.game_over:
+                sym = self.board[idx]
+                style = discord.ButtonStyle.success if sym in ("🍋", "💎", "🍫") else discord.ButtonStyle.secondary
+                btn = discord.ui.Button(label=sym, style=style, disabled=True, row=row)
+            else:
+                btn = discord.ui.Button(label=f"❓ {idx + 1}", style=discord.ButtonStyle.primary, row=row)
+                btn.callback = self.make_tile_callback(idx)
+            self.add_item(btn)
+
+    def build_embed(self) -> discord.Embed:
+        jackpot = get_raspadita_jackpot(self.guild_id)
+        scratched_count = len(self.revealed_indices)
+
+        revealed_symbols = [self.board[i] for i in self.revealed_indices]
+        slots = []
+        for i in range(3):
+            if i < len(revealed_symbols):
+                slots.append(f"**[{revealed_symbols[i]}]**")
+            else:
+                slots.append("`[ ❓ ]`")
+        slots_text = " ".join(slots)
+
+        sub_badge = " *(🔥 Descuento Sub aplicado)*" if self.is_sub else ""
+
+        embed = discord.Embed(
+            title="🎫 Raspadita del Kiosquito 🍋",
+            description=(
+                f"💰 **Pozo Acumulado:** `{money(jackpot)}`\n"
+                f"💵 **Ticket:** `{money(self.cost)}`{sub_badge}\n\n"
+                f"Tus raspadas ({scratched_count}/3): {slots_text}\n\n"
+                "👉 **Tocá 3 casillas de la grilla para rasparlas.**\n\n"
+                "**Premios posibles (3 iguales):**\n"
+                f"• `🍋 🍋 🍋` ➔ **¡POZO ACUMULADO!** ({money(jackpot)})\n"
+                "• `💎 💎 💎` ➔ **$3.500** en efectivo\n"
+                "• `🍫 🍫 🍫` ➔ **$1.500** + 1 Alfajor Jorgito"
+            ),
+            color=discord.Color.gold(),
+        )
+        return embed
+
+    def make_tile_callback(self, idx: int):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user_id:
+                await interaction.response.send_message("¡Este cartón no es tuyo! 😅", ephemeral=True)
+                return
+            if self.game_over or idx in self.revealed_indices:
+                return
+
+            self.revealed_indices.append(idx)
+            scratched = len(self.revealed_indices)
+
+            if scratched < 3:
+                self.build_grid()
+                await interaction.response.edit_message(embed=self.build_embed(), view=self)
+                return
+
+            self.game_over = True
+            c1 = self.board[self.revealed_indices[0]]
+            c2 = self.board[self.revealed_indices[1]]
+            c3 = self.board[self.revealed_indices[2]]
+
+            jackpot = get_raspadita_jackpot(self.guild_id)
+
+            if c1 == c2 == c3 == "🍋":
+                win_amount = jackpot
+                reset_raspadita_jackpot(self.guild_id)
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
+                    user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+                self.build_grid()
+                embed = discord.Embed(
+                    title="🎆 ¡¡¡GANASTE EL POZO ACUMULADO DE LA RASPADITA!!! 🍋🍋🍋",
+                    description=(
+                        f"¡¡SACASTE 3 LIMONES DE ORO!! ¡Sos el ganador del Jackpot!\n\n"
+                        f"💰 **Premio cobrado:** **+{money(win_amount)}**\n"
+                        f"💼 Billetera: **{money(user['money'])}**\n\n"
+                        "*(Se destapó todo el cartón para que veas el tablero completo)*"
+                    ),
+                    color=discord.Color.green(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+
+                if interaction.channel:
+                    try:
+                        msg = await interaction.channel.send(
+                            f"🎆 **¡¡¡FELICITACIONES {interaction.user.mention}!!!** 🍾🍋\n"
+                            f"> 🎰 ¡Acaba de raspar **3 LIMONES** `🍋 🍋 🍋` y se llevó el **POZO ACUMULADO DE {money(win_amount)}**! 💰🎉"
+                        )
+                        record_consumption_message(self.guild_id, interaction.channel_id, msg.id)
+                    except Exception as e:
+                        print(f"Aviso anuncio jackpot: {e}")
+                return
+
+            elif c1 == c2 == c3 == "💎":
+                win_amount = 3500
+                add_raspadita_jackpot(self.guild_id, 400)
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
+                    user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+                self.build_grid()
+                embed = discord.Embed(
+                    title="💎 ¡¡3 DIAMANTES! PREMIO MAYOR 💎",
+                    description=(
+                        f"¡Impresionante! Conseguiste 3 diamantes `💎 💎 💎`.\n\n"
+                        f"💵 **Premio:** **+{money(win_amount)}** en efectivo\n"
+                        f"💼 Billetera: **{money(user['money'])}**\n\n"
+                        "*(Se destapó todo el cartón para que veas el tablero completo)*"
+                    ),
+                    color=discord.Color.green(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            elif c1 == c2 == c3 == "🍫":
+                win_amount = 1500
+                add_raspadita_jackpot(self.guild_id, 400)
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild_id, self.user_id)
+                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
+                    user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+
+                add_inventory_item(self.guild_id, self.user_id, "jorgito", 1)
+
+                self.build_grid()
+                embed = discord.Embed(
+                    title="🍫 ¡¡3 GOLOSINAS! PREMIO DULCE 🍫",
+                    description=(
+                        f"¡Qué rico! Conseguiste 3 chocolates `🍫 🍫 🍫`.\n\n"
+                        f"💵 **Premio:** **+{money(win_amount)}** en efectivo\n"
+                        f"🎒 **Bonus:** **+1 Alfajor Jorgito** agregado a tu mochila!\n"
+                        f"💼 Billetera: **{money(user['money'])}**\n\n"
+                        "*(Se destapó todo el cartón para que veas el tablero completo)*"
+                    ),
+                    color=discord.Color.green(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            else:
+                new_jackpot = add_raspadita_jackpot(self.guild_id, 400)
+                user = get_user(self.guild_id, self.user_id)
+
+                self.build_grid()
+                embed = discord.Embed(
+                    title="❌ ¡Siga participando! No hubo suerte",
+                    description=(
+                        f"Sacaste: **[{c1}] [{c2}] [{c3}]**.\n\n"
+                        f"¡No te desanimes! Se sumaron **+$400** al Pozo Acumulado.\n"
+                        f"💰 **Nuevo Pozo Acumulado:** `{money(new_jackpot)}`\n"
+                        f"💼 Billetera: **{money(user['money'])}**\n\n"
+                        "*(Se destapó todo el cartón para que veas dónde estaban los demás premios)*"
+                    ),
+                    color=discord.Color.dark_grey(),
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+        return callback
+
+
+async def start_raspadita_session(interaction: discord.Interaction):
+    if not is_open(guild_id=interaction.guild_id):
+        await interaction.response.send_message(
+            f"🔒 La lotería del kiosco está cerrada. Volvemos a abrir a las **{next_opening()}**.",
+            ephemeral=True,
+        )
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
+        return
+
+    sub = is_subscriber(interaction.user)
+    cost = 750 if sub else 1000
+
+    user = get_user(interaction.guild_id, interaction.user.id)
+    if user["money"] < cost:
+        sub_text = "*(Descuento de Suscriptor / Booster aplicado ⭐)*" if sub else "*(Suscriptores pagan $750)*"
+        embed = discord.Embed(
+            title="🎫 Raspadita del Kiosquito 🍋",
+            description=(
+                f"❌ **No tenés suficiente plata en tu billetera.**\n\n"
+                f"💵 **Precio del cartón:** **{money(cost)}** {sub_text}\n"
+                f"💼 Tu saldo actual: **{money(user['money'])}**\n\n"
+                "💡 *Podés hacer una changuita con `/changuitas` o reclamar tu `/diario` para juntar plata.*"
+            ),
+            color=discord.Color.red(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
+        return
+
+    # Cobrar el ticket
+    with get_connection() as conn:
+        ensure_user(conn, interaction.guild_id, interaction.user.id)
+        conn.execute(
+            "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
+            (cost, interaction.guild_id, interaction.user.id),
+        )
+
+    view = RaspaditaGameView(
+        user_id=interaction.user.id,
+        guild_id=interaction.guild_id,
+        is_sub=sub,
+        cost=cost,
+        parent_interaction=interaction,
+    )
+    await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
+
+
 class ChanguitaSelect(discord.ui.Select):
     def __init__(self, sample_jobs: list[dict]):
         options = []
@@ -3086,6 +3393,15 @@ class PersistentKioskView(discord.ui.View):
         )
         view = ChanguitasBoardView(user_id=interaction.user.id, parent_interaction=interaction)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    @discord.ui.button(
+        label="Raspadita",
+        emoji="🎫",
+        style=discord.ButtonStyle.primary,
+        custom_id="kiosk:raspadita",
+    )
+    async def raspadita_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await start_raspadita_session(interaction)
 
     @discord.ui.button(
         label="Mi Mochila",
@@ -3726,6 +4042,12 @@ async def changuitas(interaction: discord.Interaction):
 @app_commands.guild_only()
 async def changuita(interaction: discord.Interaction):
     await changuitas.callback(interaction)
+
+
+@bot.tree.command(name="raspadita", description="Jugar a la Raspadita del Kiosquito y competir por el Pozo Acumulado.")
+@app_commands.guild_only()
+async def raspadita_cmd(interaction: discord.Interaction):
+    await start_raspadita_session(interaction)
 
 
 @bot.tree.command(name="diario", description="Cobrar tu recompensa diaria.")
