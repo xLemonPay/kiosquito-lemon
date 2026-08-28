@@ -3368,6 +3368,20 @@ async def on_message(message: discord.Message):
     if message.author.bot or not message.guild:
         return
 
+    # Auto-limpieza en el canal oficial del Kiosquito:
+    # Si un usuario escribe un mensaje de texto normal en #el-kiosquito-de-lemon, se borra para mantener el canal limpio
+    kiosk_channel_id_raw = get_setting(message.guild.id, "kiosk_channel_id", "0")
+    if str(message.channel.id) == kiosk_channel_id_raw:
+        try:
+            await message.delete()
+            await message.channel.send(
+                f"🤫 {message.author.mention}, este canal es exclusivo para el panel del kiosco y comandos `/`. Para chatear andá a los demás canales.",
+                delete_after=4,
+            )
+        except Exception:
+            pass
+        return
+
     key = (message.guild.id, message.author.id)
     now = time.time()
     cooldown = CONFIG["message_xp_cooldown_seconds"]
