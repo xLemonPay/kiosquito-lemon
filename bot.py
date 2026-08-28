@@ -1330,6 +1330,17 @@ def kiosk_open_embed(guild_id: int | None = None) -> discord.Embed:
     )
 
     if guild_id:
+        jackpot = get_raspadita_jackpot(guild_id)
+        embed.add_field(
+            name="🎰 Lotería del Kiosquito — ¡POZO ACUMULADO!",
+            value=(
+                f"💰 Pozo actual: **{money(jackpot)}** 🍋\n"
+                f"🎟️ Cartón: **$1.000** *(**$750** para Suscriptores y Boosters)*\n"
+                f"👉 Tocá el botón **`🎫 Raspadita`** para jugar."
+            ),
+            inline=False,
+        )
+
         offers = get_shift_offers(guild_id)
         if offers:
             offer_lines = []
@@ -1361,11 +1372,13 @@ def kiosk_closed_embed(guild_id: int) -> discord.Embed:
     shift_id = get_current_shift_id(guild_id)
     sales_rows, total_money = get_shift_sales_summary(guild_id, shift_id)
     debtors = get_guild_debtors(guild_id)
+    jackpot = get_raspadita_jackpot(guild_id)
 
     embed = discord.Embed(
         title="🏪 El Kiosquito de Lemon — CERRADO 🔒",
         description=(
             f"El mostrador está cerrado. Volvemos a abrir a las **{next_opening(now)}**.\n\n"
+            f"🎰 **Pozo Acumulado de la Raspadita:** **{money(jackpot)}** 🍋\n\n"
             f"### 🕗 Horarios habituales (Hora Arg)\n{opening_hours_text()}\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "📊 **RESUMEN DE LA JORNADA**\n"
@@ -2782,6 +2795,8 @@ class RaspaditaGameView(discord.ui.View):
                         record_consumption_message(self.guild_id, interaction.channel_id, msg.id)
                     except Exception as e:
                         print(f"Aviso anuncio jackpot: {e}")
+                if interaction.guild:
+                    asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
                 return
 
             elif c1 == c2 == c3 == "💎":
@@ -2804,6 +2819,8 @@ class RaspaditaGameView(discord.ui.View):
                     color=discord.Color.green(),
                 )
                 await interaction.response.edit_message(embed=embed, view=self)
+                if interaction.guild:
+                    asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
                 return
 
             elif c1 == c2 == c3 == "🍫":
@@ -2829,6 +2846,8 @@ class RaspaditaGameView(discord.ui.View):
                     color=discord.Color.green(),
                 )
                 await interaction.response.edit_message(embed=embed, view=self)
+                if interaction.guild:
+                    asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
                 return
 
             else:
@@ -2848,9 +2867,83 @@ class RaspaditaGameView(discord.ui.View):
                     color=discord.Color.dark_grey(),
                 )
                 await interaction.response.edit_message(embed=embed, view=self)
+                if interaction.guild:
+                    asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
                 return
 
         return callback
+
+
+class RaspaditaConfirmView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int, is_sub: bool, cost: int):
+        super().__init__(timeout=90)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.is_sub = is_sub
+        self.cost = cost
+
+    @discord.ui.button(
+        label="Comprar y Raspar",
+        emoji="🟢",
+        style=discord.ButtonStyle.success,
+        custom_id="raspadita:confirm",
+    )
+    async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Esta ventana no es tuya! 😅", ephemeral=True)
+            return
+
+        if not is_open(guild_id=self.guild_id):
+            await interaction.response.edit_message(
+                content=f"🔒 La lotería del kiosco cerró. Volvemos a abrir a las **{next_opening()}**.",
+                embed=None,
+                view=None,
+            )
+            return
+
+        user = get_user(self.guild_id, self.user_id)
+        if user["money"] < self.cost:
+            await interaction.response.edit_message(
+                content=f"💸 No te alcanza la plata. Necesitás **{money(self.cost)}** y tenés **{money(user['money'])}**.",
+                embed=None,
+                view=None,
+            )
+            return
+
+        # Descontar dinero del usuario
+        with get_connection() as conn:
+            ensure_user(conn, self.guild_id, self.user_id)
+            conn.execute(
+                "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
+                (self.cost, self.guild_id, self.user_id),
+            )
+
+        view = RaspaditaGameView(
+            user_id=self.user_id,
+            guild_id=self.guild_id,
+            is_sub=self.is_sub,
+            cost=self.cost,
+            parent_interaction=interaction,
+        )
+        await interaction.response.edit_message(content=None, embed=view.build_embed(), view=view)
+
+    @discord.ui.button(
+        label="Cancelar",
+        emoji="❌",
+        style=discord.ButtonStyle.secondary,
+        custom_id="raspadita:cancel",
+    )
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Esta ventana no es tuya! 😅", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title="🎫 Raspadita cancelada",
+            description="No se te cobró nada. ¡Volvé cuando quieras tentar a la suerte!",
+            color=discord.Color.dark_grey(),
+        )
+        await interaction.response.edit_message(content=None, embed=embed, view=None)
 
 
 async def start_raspadita_session(interaction: discord.Interaction):
@@ -2864,8 +2957,9 @@ async def start_raspadita_session(interaction: discord.Interaction):
 
     sub = is_subscriber(interaction.user)
     cost = 750 if sub else 1000
-
+    jackpot = get_raspadita_jackpot(interaction.guild_id)
     user = get_user(interaction.guild_id, interaction.user.id)
+
     if user["money"] < cost:
         sub_text = "*(Descuento de Suscriptor / Booster aplicado ⭐)*" if sub else "*(Suscriptores pagan $750)*"
         embed = discord.Embed(
@@ -2882,22 +2976,32 @@ async def start_raspadita_session(interaction: discord.Interaction):
         asyncio.create_task(auto_delete_interaction(interaction, 180))
         return
 
-    # Cobrar el ticket
-    with get_connection() as conn:
-        ensure_user(conn, interaction.guild_id, interaction.user.id)
-        conn.execute(
-            "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
-            (cost, interaction.guild_id, interaction.user.id),
-        )
+    sub_badge = " *(🔥 Descuento de Suscriptor / Booster aplicado)*" if sub else ""
 
-    view = RaspaditaGameView(
+    embed = discord.Embed(
+        title="🎫 Lotería «El Lemoncito» — Confirmar Compra",
+        description=(
+            f"💰 **Pozo Acumulado actual:** `{money(jackpot)}` 🍋\n\n"
+            f"💵 **Precio de tu cartón:** **{money(cost)}**{sub_badge}\n"
+            f"💼 **Tu saldo en billetera:** **{money(user['money'])}**\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🏆 **Tabla de Premios (3 casillas iguales):**\n"
+            f"• `🍋 🍋 🍋` ➔ **¡EL POZO ACUMULADO!** ({money(jackpot)})\n"
+            "• `💎 💎 💎` ➔ **$3.500** en efectivo\n"
+            "• `🍫 🍫 🍫` ➔ **$1.500** + 1 Alfajor Jorgito\n"
+            "• ❌ *Siga participando* ➔ Suma **+$400** al Pozo Acumulado\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "¿Querés comprar este cartón y raspar ahora?"
+        ),
+        color=discord.Color.gold(),
+    )
+    view = RaspaditaConfirmView(
         user_id=interaction.user.id,
         guild_id=interaction.guild_id,
         is_sub=sub,
         cost=cost,
-        parent_interaction=interaction,
     )
-    await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class ChanguitaSelect(discord.ui.Select):
