@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 
 ROOT = Path(__file__).resolve().parent
-DATA_DIR = ROOT / "data"
+DATA_DIR = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
 DB_PATH = DATA_DIR / "kiosquito.db"
 
 with open(ROOT / "config.json", "r", encoding="utf-8") as f:
