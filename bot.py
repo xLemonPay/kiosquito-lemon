@@ -3292,17 +3292,22 @@ class KiosquitoBot(commands.Bot):
         init_db()
         self.add_view(PersistentKioskView())
 
-        if TEST_GUILD_ID:
-            guild = discord.Object(id=TEST_GUILD_ID)
-            self.tree.copy_global_to(guild=guild)
-            synced = await self.tree.sync(guild=guild)
-            print(
-                f"✅ {len(synced)} comandos sincronizados al servidor de prueba "
-                f"{TEST_GUILD_ID}."
-            )
-        else:
+        # 1. Sincronizar siempre globalmente para que funcione en todos los servidores
+        try:
             synced = await self.tree.sync()
             print(f"✅ {len(synced)} comandos globales sincronizados.")
+        except Exception as e:
+            print(f"⚠️ Error sincronizando comandos globales: {e}")
+
+        # 2. Si hay un TEST_GUILD_ID configurado, sincronizarlo también allí
+        if TEST_GUILD_ID:
+            try:
+                guild_obj = discord.Object(id=TEST_GUILD_ID)
+                self.tree.copy_global_to(guild=guild_obj)
+                synced_guild = await self.tree.sync(guild=guild_obj)
+                print(f"✅ {len(synced_guild)} comandos sincronizados instantáneamente a guild {TEST_GUILD_ID}.")
+            except Exception as e:
+                print(f"Aviso al sincronizar guild de prueba {TEST_GUILD_ID}: {e}")
 
 
 intents = discord.Intents.default()
@@ -3315,10 +3320,18 @@ async def on_ready():
     print(f"🏪 Bot conectado como: {bot.user} • v{BOT_VERSION}")
     print(f"🕗 Hora Argentina: {datetime.now(TZ).strftime('%H:%M')}")
     print(f"Estado por horario: {'ABIERTO' if is_open() else 'CERRADO'}")
+    print(f"🌐 Servidores activos ({len(bot.guilds)}): {', '.join([g.name for g in bot.guilds])}")
     print("=" * 52)
 
     now = datetime.now(TZ)
     for guild in bot.guilds:
+        # Sincronizar comandos en cada servidor para que aparezcan al instante sin demoras
+        try:
+            bot.tree.copy_global_to(guild=guild)
+            await bot.tree.sync(guild=guild)
+        except Exception as e:
+            print(f"Aviso sincronizando comandos en '{guild.name}': {e}")
+
         currently_open = is_open(now, guild.id)
         last_state = get_setting(guild.id, "last_open_state", "-1")
 
@@ -3338,7 +3351,14 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild: discord.Guild):
-    print(f"🎉 El bot se ha unido a: {guild.name} ({guild.id})")
+    print(f"🎉 El bot se ha unido a un nuevo servidor: {guild.name} ({guild.id})")
+    try:
+        bot.tree.copy_global_to(guild=guild)
+        await bot.tree.sync(guild=guild)
+        print(f"✅ Comandos slash sincronizados al instante en '{guild.name}'")
+    except Exception as e:
+        print(f"Aviso al sincronizar comandos en '{guild.name}': {e}")
+
     # Crear/detectar canal automáticamente y publicar el panel
     await update_kiosk_fixed_message(guild, repost=True)
 
