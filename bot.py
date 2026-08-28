@@ -1316,44 +1316,25 @@ def inventory_embed(member: discord.Member, guild_id: int) -> discord.Embed:
 
 def kiosk_open_embed(guild_id: int | None = None) -> discord.Embed:
     now = datetime.now(TZ)
-    embed = discord.Embed(
-        title="🏪 El Kiosquito de Lemon — ¡ABIERTO! 🟢",
-        description=(
-            "¡Buenas, maestro! El mostrador está atendiendo.\n\n"
-            "🛒 **Comprá** golosinas con stock limitado.\n"
-            "🧹 **Hacé changuitas** para ganar plata y reponer el stock.\n"
-            "🎒 **Revisá tu mochila** y consumí para sumar XP.\n"
-            "🤝 **Fiado** disponible a partir de 2.000 XP.\n\n"
-            f"### 🕗 Horarios de atención (Argentina)\n{opening_hours_text()}"
-        ),
-        color=discord.Color.green(),
-    )
+    jackpot = get_raspadita_jackpot(guild_id) if guild_id else 10000
+
+    desc_lines = [
+        "¡Buenas, maestro! El mostrador está atendiendo.\n",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "🎰 **POZO DE LA RASPADITA**",
+        f"💰 Acumulado: **{money(jackpot)}**  •  🎟️ Ticket: **$1.000** *($750 Subs)*\n",
+    ]
 
     if guild_id:
-        jackpot = get_raspadita_jackpot(guild_id)
-        embed.add_field(
-            name="🎰 Lotería del Kiosquito — ¡POZO ACUMULADO!",
-            value=(
-                f"💰 Pozo actual: **{money(jackpot)}** 🍋\n"
-                f"🎟️ Cartón: **$1.000** *(**$750** para Suscriptores y Boosters)*\n"
-                f"👉 Tocá el botón **`🎫 Raspadita`** para jugar."
-            ),
-            inline=False,
-        )
-
         offers = get_shift_offers(guild_id)
         if offers:
-            offer_lines = []
+            desc_lines.append("🏷️ **OFERTAS DE LA JORNADA**")
             for pid, disc_price in offers.items():
                 p = PRODUCTS.get(pid)
                 if p:
                     stock = get_kiosk_stock(guild_id, pid)
-                    offer_lines.append(f"🔥 {p['emoji']} **{p['name']}**: **{money(disc_price)}** *(Antes {money(p['price'])})* • Quedan: `{stock}`")
-            embed.add_field(
-                name="🏷️ ¡OFERTAS ESPECIALES DE LA JORNADA!",
-                value="\n".join(offer_lines),
-                inline=False,
-            )
+                    desc_lines.append(f"🔥 {p['emoji']} **{p['name']}**: **{money(disc_price)}** *(Antes {money(p['price'])})* • Stock: `{stock} un.`")
+            desc_lines.append("")
 
         manual_open, rem = manual_open_status(guild_id)
         if manual_open:
@@ -1361,8 +1342,19 @@ def kiosk_open_embed(guild_id: int | None = None) -> discord.Embed:
                 extra = "🔓 *Apertura manual activa.*"
             else:
                 extra = f"🔓 *Apertura manual activa por {seconds_text(rem)}.*"
-            embed.add_field(name="Estado Extra", value=extra, inline=False)
+            desc_lines.append(f"{extra}\n")
 
+    desc_lines.extend([
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"⏰ **Horarios:** `08:00 – 13:00 hs` | `17:00 – 00:00 hs` *(Arg)*",
+        "👉 *Tocá los botones de abajo para comprar, laburar o raspar.*",
+    ])
+
+    embed = discord.Embed(
+        title="🏪 EL KIOSQUITO DE LEMON 🍋",
+        description="\n".join(desc_lines),
+        color=discord.Color.green(),
+    )
     embed.set_footer(text=f"🟢 Abierto • Hora Argentina {now.strftime('%H:%M')}")
     return embed
 
@@ -1374,46 +1366,48 @@ def kiosk_closed_embed(guild_id: int) -> discord.Embed:
     debtors = get_guild_debtors(guild_id)
     jackpot = get_raspadita_jackpot(guild_id)
 
-    embed = discord.Embed(
-        title="🏪 El Kiosquito de Lemon — CERRADO 🔒",
-        description=(
-            f"El mostrador está cerrado. Volvemos a abrir a las **{next_opening(now)}**.\n\n"
-            f"🎰 **Pozo Acumulado de la Raspadita:** **{money(jackpot)}** 🍋\n\n"
-            f"### 🕗 Horarios habituales (Hora Arg)\n{opening_hours_text()}\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 **RESUMEN DE LA JORNADA**\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        ),
-        color=discord.Color.red(),
-    )
+    desc_lines = [
+        f"El mostrador está cerrado. Volvemos a abrir a las **{next_opening(now)}**.\n",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"🎰 **POZO ACUMULADO:** **{money(jackpot)}** 🍋 *(Guardado para la próxima apertura)*",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "📊 **RESUMEN DE LA JORNADA**\n",
+    ]
 
-    # 1. Productos vendidos
     if sales_rows:
         sales_lines = []
         for r in sales_rows:
             prod = PRODUCTS.get(r["product_id"])
             pname = prod["name"] if prod else r["product_id"]
             pemoji = prod["emoji"] if prod else "📦"
-            sales_lines.append(f"{pemoji} **{pname}**: ×{r['total_qty']} ({money(r['total_money'])})")
-        sales_text = "\n".join(sales_lines)
+            sales_lines.append(f"• {pemoji} **{pname}**: ×{r['total_qty']} ({money(r['total_money'])})")
+        desc_lines.append("\n".join(sales_lines))
     else:
-        sales_text = "No se registraron ventas en esta jornada."
+        desc_lines.append("• *No se registraron ventas en esta jornada.*")
 
-    embed.add_field(name="📦 Productos vendidos", value=sales_text, inline=False)
-    embed.add_field(name="💰 Facturación total", value=f"**{money(total_money)}**", inline=True)
+    desc_lines.append(f"\n💰 **Facturación total:** **{money(total_money)}**\n")
 
-    # 2. Deudores del kiosquito
     if debtors:
+        desc_lines.append("🧾 **Deudores de la Libretita:**")
         debt_lines = []
-        for d in debtors[:15]:
+        for d in debtors[:10]:
             debt_lines.append(f"• <@{d['user_id']}>: **{money(d['debt'])}**")
-        if len(debtors) > 15:
-            debt_lines.append(f"*...y {len(debtors) - 15} más.*")
-        debt_text = "\n".join(debt_lines)
+        if len(debtors) > 10:
+            debt_lines.append(f"*...y {len(debtors) - 10} más.*")
+        desc_lines.append("\n".join(debt_lines))
     else:
-        debt_text = "✨ ¡Nadie debe nada! Milagro barrial."
+        desc_lines.append("✨ *¡Nadie debe nada! Milagro barrial.*")
 
-    embed.add_field(name="🧾 Deudores del Kiosquito (Libretita)", value=debt_text, inline=False)
+    desc_lines.extend([
+        "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"⏰ **Horarios habituales:** `08:00 – 13:00 hs` | `17:00 – 00:00 hs` *(Arg)*",
+    ])
+
+    embed = discord.Embed(
+        title="🏪 EL KIOSQUITO DE LEMON — CERRADO 🔒",
+        description="\n".join(desc_lines),
+        color=discord.Color.red(),
+    )
     embed.set_footer(text=f"🔒 Cerrado • Hora Argentina {now.strftime('%H:%M')}")
     return embed
 
@@ -3788,10 +3782,12 @@ async def on_message(message: discord.Message):
     if message.author.bot or not message.guild:
         return
 
-    # Auto-limpieza en el canal oficial del Kiosquito:
+    # Auto-limpieza en el canal oficial del Kiosquito (si está activada):
     # Si un usuario escribe un mensaje de texto normal en #el-kiosquito-de-lemon, se borra para mantener el canal limpio
     kiosk_channel_id_raw = get_setting(message.guild.id, "kiosk_channel_id", "0")
-    if str(message.channel.id) == kiosk_channel_id_raw:
+    auto_cleanup_active = get_setting(message.guild.id, "auto_cleanup_enabled", "1") == "1"
+
+    if auto_cleanup_active and str(message.channel.id) == kiosk_channel_id_raw:
         try:
             await message.delete()
             await message.channel.send(
@@ -4389,13 +4385,11 @@ async def ranking(interaction: discord.Interaction):
     medals = ["🥇", "🥈", "🥉"]
     lines = []
     for index, row in enumerate(rows):
-        member = interaction.guild.get_member(row["user_id"])
-        name = member.display_name if member else f"Usuario {row['user_id']}"
         prefix = medals[index] if index < 3 else f"`#{index + 1}`"
-        lines.append(f"{prefix} **{name}** — {row['xp']} XP")
+        lines.append(f"{prefix} <@{row['user_id']}> — **{row['xp']} XP** *(Billetera: {money(row['money'])})*")
 
     embed = discord.Embed(
-        title="🏆 Clientes de confianza",
+        title="🏆 Clientes de Confianza del Kiosquito",
         description="\n".join(lines),
         color=discord.Color.gold(),
     )
@@ -4628,6 +4622,25 @@ async def admin_resetear(interaction: discord.Interaction, usuario: discord.Memb
         ephemeral=True,
     )
     asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+
+@bot.tree.command(name="autolimpieza", description="[Admin] Activar o desactivar el borrado automático de mensajes comunes en el kiosco.")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(activado="True para borrar texto común (deja el canal limpio), False para permitir chatear libremente.")
+@app_commands.guild_only()
+async def autolimpieza_cmd(interaction: discord.Interaction, activado: bool):
+    set_setting(interaction.guild_id, "auto_cleanup_enabled", "1" if activado else "0")
+    status = (
+        "🟢 **ACTIVADA** (el bot borrará los mensajes de texto común para mantener el canal limpio)"
+        if activado
+        else "🔴 **DESACTIVADA** (ahora se pueden enviar mensajes de texto comunes libremente en el canal)"
+    )
+    kiosk_ch_id = get_setting(interaction.guild_id, "kiosk_channel_id", "0")
+    ch_mention = f"<#{kiosk_ch_id}>" if kiosk_ch_id != "0" else "el canal del kiosco"
+    await interaction.response.send_message(
+        f"🧹 **Auto-limpieza del Kiosquito en {ch_mention}:** {status}.",
+        ephemeral=True,
+    )
 
 
 # ---------- AUTOCOMPLETES DINÁMICOS ----------

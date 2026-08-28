@@ -59,6 +59,7 @@
 - `/admin_dar_dinero <usuario> <cantidad>` — Modifica el dinero de un usuario.
 - `/admin_dar_xp <usuario> <cantidad>` — Modifica la XP de un usuario.
 - `/admin_resetear <usuario>` — Resetea los datos e inventario de un usuario.
+- `/autolimpieza <activado:True/False>` — Activa o desactiva el borrado automático de mensajes comunes en el canal del kiosco.
 
 ## 💬 Experiencia Automática
 - Los usuarios reciben entre 3 y 7 XP al participar activamente en el chat (con un cooldown de 1 minuto).
