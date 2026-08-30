@@ -3192,7 +3192,7 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
         existing_bets = get_user_quiniela_bets(self.guild_id, interaction.user.id)
         if len(existing_bets) >= 3:
             await interaction.response.send_message(
-                "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 21:00 hs para ver los resultados!",
+                "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 22:00 hs para ver los resultados!",
                 ephemeral=True,
             )
             return
@@ -3238,7 +3238,7 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
                 f"• 🎯 **Acierto a la cabeza (x35):** **+{money(premio_potencial)}**\n"
                 f"• 🤏 **Pegó en el palo (x2):** **+{money(premio_palo)}** *(si sale {num-1 if num>1 else 50} o {num+1 if num<50 else 1})*\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                "🔔 *Se te asignó el rol `@Quinielero`. Te avisaremos a las **21:00 hs** cuando arranque el sorteo en vivo.*"
+                "🔔 *Se te asignó el rol `@Quinielero`. Te avisaremos a las **22:00 hs** cuando arranque el sorteo en vivo.*"
             ),
             color=discord.Color.green(),
         )
@@ -3306,7 +3306,7 @@ async def start_quiniela_session(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🎱 Quiniela del Kiosquito — ¡Apostá a tu Número! 🍀",
         description=(
-            "¡Elegí tu número de la suerte del **1 al 50** para el sorteo diario de las **21:00 hs**!\n\n"
+            "¡Elegí tu número de la suerte del **1 al 50** para el sorteo diario de las **22:00 hs**!\n\n"
             "🏆 **Tabla de Pagos:**\n"
             "• 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** tu apuesta.\n"
             "• 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** tu apuesta.\n\n"
@@ -4342,21 +4342,21 @@ async def presence_loop():
             restock_kiosk(guild.id)
             await update_kiosk_fixed_message(guild, repost=False)
 
-        # Verificación de Quiniela Automática (Diaria a las 21:00 hs):
+        # Verificación de Quiniela Automática (Diaria a las 22:00 hs):
         auto_quiniela = get_setting(guild.id, "quiniela_auto_enabled", "1") == "1"
         if auto_quiniela:
             today_str = now.strftime("%Y-%m-%d")
-            if now.hour == 20 and now.minute == 40:
+            if now.hour == 21 and now.minute == 40:
                 last_20m = get_setting(guild.id, "last_quiniela_20m_date", "")
                 if last_20m != today_str:
                     set_setting(guild.id, "last_quiniela_20m_date", today_str)
                     await send_quiniela_announcement_20m(guild)
-            elif now.hour == 20 and now.minute == 55:
+            elif now.hour == 21 and now.minute == 55:
                 last_5m = get_setting(guild.id, "last_quiniela_5m_date", "")
                 if last_5m != today_str:
                     set_setting(guild.id, "last_quiniela_5m_date", today_str)
                     await send_quiniela_announcement_5m(guild)
-            elif now.hour == 21 and now.minute == 0:
+            elif now.hour == 22 and now.minute == 0:
                 last_draw = get_setting(guild.id, "last_quiniela_draw_date", "")
                 if last_draw != today_str:
                     set_setting(guild.id, "last_quiniela_draw_date", today_str)
@@ -5192,7 +5192,7 @@ async def quiniela_cmd(
     existing_bets = get_user_quiniela_bets(interaction.guild_id, interaction.user.id)
     if len(existing_bets) >= 3:
         await interaction.response.send_message(
-            "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 21:00 hs para ver los resultados!",
+            "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 22:00 hs para ver los resultados!",
             ephemeral=True,
         )
         return
@@ -5236,11 +5236,12 @@ async def quiniela_cmd(
             f"• 🎯 **Acierto a la cabeza (x35):** **+{money(premio_potencial)}**\n"
             f"• 🤏 **Pegó en el palo (x2):** **+{money(premio_palo)}** *(si sale {numero-1 if numero>1 else 50} o {numero+1 if numero<50 else 1})*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🔔 *Se te asignó el rol `@Quinielero`. Te avisaremos a las **21:00 hs** cuando arranque el sorteo en vivo.*"
+            "🔔 *Se te asignó el rol `@Quinielero`. Te avisaremos a las **22:00 hs** cuando arranque el sorteo en vivo.*"
         ),
         color=discord.Color.green(),
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
 
 
 @bot.tree.command(name="admin_sortear_quiniela", description="[Admin] Forzar y ejecutar el sorteo oficial de la Quiniela en vivo ahora mismo.")
@@ -5252,14 +5253,14 @@ async def admin_sortear_quiniela_cmd(interaction: discord.Interaction):
     await run_quiniela_draw(interaction.guild, target_channel=interaction.channel, is_private=False)
 
 
-@bot.tree.command(name="admin_quiniela_automatica", description="[Admin] Activar o desactivar los anuncios y sorteos automáticos a las 21:00 hs.")
+@bot.tree.command(name="admin_quiniela_automatica", description="[Admin] Activar o desactivar los anuncios y sorteos automáticos a las 22:00 hs.")
 @app_commands.checks.has_permissions(manage_guild=True)
 @app_commands.describe(activado="True para activar sorteos automáticos diarios, False para dejarlos en modo manual/test.")
 @app_commands.guild_only()
 async def admin_quiniela_automatica_cmd(interaction: discord.Interaction, activado: bool):
     set_setting(interaction.guild_id, "quiniela_auto_enabled", "1" if activado else "0")
     status = (
-        "🟢 **ACTIVADA** (el bot publicará anuncios a las 20:40 y 20:55, y sorteará en vivo a las 21:00 hs)"
+        "🟢 **ACTIVADA** (el bot publicará anuncios a las 21:40 y 21:55, y sorteará en vivo a las 22:00 hs)"
         if activado
         else "🔴 **DESACTIVADA (MODO TEST)** (no se enviará ningún aviso automático; solo se sortea manualmente con `/admin_sortear_quiniela`)"
     )
