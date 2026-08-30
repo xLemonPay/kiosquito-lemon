@@ -3227,6 +3227,7 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
             color=discord.Color.green(),
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
 
 
 class QuinielaView(discord.ui.View):
@@ -3308,6 +3309,8 @@ async def start_quiniela_session(interaction: discord.Interaction):
     else:
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+
 
 async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextChannel | None = None, is_private: bool = False):
     channel = target_channel or await get_or_create_kiosk_channel(guild)
@@ -3325,12 +3328,12 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
             break
 
     sorteando_path = ROOT / "assets" / "quiniela" / "sorteando.gif"
-    role_ping = quinielero_role.mention if (quinielero_role and not is_private) else "**[ MODO DE TEST / PRUEBA PRIVADA ]**"
+    role_ping = quinielero_role.mention if (quinielero_role and not is_private) else ""
 
     initial_embed = discord.Embed(
         title="🎱 ¡SORTEO OFICIAL DE LA QUINIELA DEL KIOSQUITO! 🎰",
         description=(
-            f"{role_ping}\n\n"
+            f"{role_ping}\n\n" if role_ping else ""
             "🧔 **El Kiosquero:** *«¡Atención a todos los vecinos! Hacemos girar el bolillero de metal...»*\n\n"
             "⏳ *Las bolillas están dando vueltas en el aire a toda velocidad...*"
         ),
@@ -3342,10 +3345,14 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
         initial_embed.set_image(url="attachment://sorteando.gif")
 
     content_msg = quinielero_role.mention if (quinielero_role and not is_private) else None
-    if gif_file:
-        draw_msg = await channel.send(content=content_msg, embed=initial_embed, file=gif_file)
-    else:
-        draw_msg = await channel.send(content=content_msg, embed=initial_embed)
+    draw_msg = None
+    try:
+        if gif_file:
+            draw_msg = await channel.send(content=content_msg, embed=initial_embed, file=gif_file)
+        else:
+            draw_msg = await channel.send(content=content_msg, embed=initial_embed)
+    except Exception as e:
+        print(f"Error enviando mensaje inicial de la quiniela: {e}")
 
     # Pausa de 3 segundos para suspenso y animación
     await asyncio.sleep(3.0)
@@ -3407,11 +3414,19 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
     if result_file:
         final_embed.set_image(url=f"attachment://{win_number}.png")
 
+    # Limpiar el mensaje de animación previo para dejar el canal impecable
+    if draw_msg:
+        try:
+            await draw_msg.delete()
+        except Exception:
+            pass
+
     try:
         if result_file:
-            await channel.send(embed=final_embed, file=result_file)
+            res_msg = await channel.send(embed=final_embed, file=result_file)
         else:
-            await channel.send(embed=final_embed)
+            res_msg = await channel.send(embed=final_embed)
+        record_consumption_message(guild.id, channel.id, res_msg.id)
     except Exception as e:
         print(f"Error publicando resultado final de la quiniela: {e}")
 
@@ -4311,8 +4326,8 @@ async def presence_loop():
             restock_kiosk(guild.id)
             await update_kiosk_fixed_message(guild, repost=False)
 
-        # Verificación de Quiniela Automática (Solo si el admin la activó con quiniela_auto_enabled == "1"):
-        auto_quiniela = get_setting(guild.id, "quiniela_auto_enabled", "0") == "1"
+        # Verificación de Quiniela Automática (Diaria a las 21:00 hs):
+        auto_quiniela = get_setting(guild.id, "quiniela_auto_enabled", "1") == "1"
         if auto_quiniela:
             today_str = now.strftime("%Y-%m-%d")
             if now.hour == 20 and now.minute == 40:
@@ -5204,13 +5219,13 @@ async def quiniela_cmd(
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@bot.tree.command(name="admin_sortear_quiniela", description="[Admin] Forzar o probar el sorteo de la Quiniela en vivo.")
+@bot.tree.command(name="admin_sortear_quiniela", description="[Admin] Forzar y ejecutar el sorteo oficial de la Quiniela en vivo ahora mismo.")
 @app_commands.checks.has_permissions(manage_guild=True)
-@app_commands.describe(privado="True para no arrobar a nadie (modo test), False para hacer el sorteo oficial con mención.")
 @app_commands.guild_only()
-async def admin_sortear_quiniela_cmd(interaction: discord.Interaction, privado: bool = True):
-    await interaction.response.send_message("🎰 **Iniciando sorteo de la Quiniela...**", ephemeral=True)
-    await run_quiniela_draw(interaction.guild, target_channel=interaction.channel, is_private=privado)
+async def admin_sortear_quiniela_cmd(interaction: discord.Interaction):
+    await interaction.response.send_message("🎰 **Iniciando sorteo de la Quiniela en vivo...**", ephemeral=True)
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+    await run_quiniela_draw(interaction.guild, target_channel=interaction.channel, is_private=False)
 
 
 @bot.tree.command(name="admin_quiniela_automatica", description="[Admin] Activar o desactivar los anuncios y sorteos automáticos a las 21:00 hs.")
