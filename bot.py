@@ -3354,8 +3354,8 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
     except Exception as e:
         print(f"Error enviando mensaje inicial de la quiniela: {e}")
 
-    # Pausa de 3 segundos para suspenso y animación
-    await asyncio.sleep(3.0)
+    # Pausa de 8 segundos para que se aprecie la animación del GIF del bolillero
+    await asyncio.sleep(8.0)
 
     # Calcular ganadores
     exact_winners = []
