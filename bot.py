@@ -1075,6 +1075,14 @@ def get_active_quiniela_bets(guild_id: int) -> list[sqlite3.Row]:
         ).fetchall()
 
 
+def get_user_quiniela_bets(guild_id: int, user_id: int) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM quiniela_bets WHERE guild_id=? AND user_id=?",
+            (guild_id, user_id),
+        ).fetchall()
+
+
 def clear_quiniela_bets(guild_id: int) -> None:
     with get_connection() as conn:
         conn.execute("DELETE FROM quiniela_bets WHERE guild_id=?", (guild_id,))
@@ -3181,6 +3189,14 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
             await interaction.response.send_message("❌ La apuesta mínima es de **$100** y la máxima de **$1.000**.", ephemeral=True)
             return
 
+        existing_bets = get_user_quiniela_bets(self.guild_id, interaction.user.id)
+        if len(existing_bets) >= 3:
+            await interaction.response.send_message(
+                "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 21:00 hs para ver los resultados!",
+                ephemeral=True,
+            )
+            return
+
         user = get_user(self.guild_id, interaction.user.id)
         if user["money"] < apuesta:
             await interaction.response.send_message(
@@ -5171,6 +5187,14 @@ async def quiniela_cmd(
 ):
     if numero is None or apuesta is None:
         await start_quiniela_session(interaction)
+        return
+
+    existing_bets = get_user_quiniela_bets(interaction.guild_id, interaction.user.id)
+    if len(existing_bets) >= 3:
+        await interaction.response.send_message(
+            "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 21:00 hs para ver los resultados!",
+            ephemeral=True,
+        )
         return
 
     user = get_user(interaction.guild_id, interaction.user.id)

@@ -38,7 +38,7 @@
   - 💎 **`💎 💎 💎` (8%):** Ganás **$3.500** en efectivo.
   - 🍫 **`🍫 🍫 🍫` (12%):** Ganás **$1.500** + 1 Alfajor Jorgito a tu mochila.
   - ❌ **Sin Premio (78%):** Se suman **+$400** al Pozo Acumulado.
-- `/quiniela [numero] [apuesta]` — Apostar a un número de la suerte (del 1 al 50) para el sorteo diario de las 21:00 hs.
+- `/quiniela [numero] [apuesta]` — Apostar a un número de la suerte (del 1 al 50) para el sorteo diario de las 21:00 hs (Máximo 3 apuestas por usuario por sorteo).
   - 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** la apuesta.
   - 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** la apuesta.
   - 🔔 Asigna el rol `@Quinielero` automáticamente para notificar en el sorteo en vivo.
