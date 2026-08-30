@@ -3148,9 +3148,10 @@ async def start_raspadita_session(interaction: discord.Interaction):
 
 
 class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
-    def __init__(self, guild_id: int):
+    def __init__(self, guild_id: int, parent_interaction: discord.Interaction | None = None):
         super().__init__()
         self.guild_id = guild_id
+        self.parent_interaction = parent_interaction
 
     numero_input = discord.ui.TextInput(
         label="Número de la suerte (del 1 al 50)",
@@ -3215,6 +3216,13 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
 
         record_quiniela_bet(self.guild_id, interaction.user.id, num, apuesta)
 
+        # Borrar el mensaje de selección previo para que no se dupliquen
+        if self.parent_interaction:
+            try:
+                await self.parent_interaction.delete_original_response()
+            except Exception:
+                pass
+
         # Asignar rol Quinielero
         quinielero_role = await get_or_create_quinielero_role(interaction.guild)
         if quinielero_role and isinstance(interaction.user, discord.Member):
@@ -3226,13 +3234,14 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
         num_info = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
         premio_potencial = apuesta * 35
         premio_palo = apuesta * 2
+        total_bets_now = len(existing_bets) + 1
 
         embed = discord.Embed(
             title="🎫 ¡Apuesta Registrada en la Quiniela! 🍀",
             description=(
                 f"🧔 **El Kiosquero:** *«¡Anotado en la boleta, maestro! Mucha suerte hoy.»*\n\n"
                 f"🎱 **Tu Número:** **`{num:02d}` — {num_info['name']} {num_info['emoji']}**\n"
-                f"💵 **Tu Apuesta:** **{money(apuesta)}**\n\n"
+                f"💵 **Tu Apuesta:** **{money(apuesta)}** *(Llevás {total_bets_now}/3 jugadas hoy)*\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "🏆 **Premios Potenciales:**\n"
                 f"• 🎯 **Acierto a la cabeza (x35):** **+{money(premio_potencial)}**\n"
@@ -3247,10 +3256,15 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
 
 
 class QuinielaView(discord.ui.View):
-    def __init__(self, user_id: int, guild_id: int):
+    def __init__(self, user_id: int, guild_id: int, parent_interaction: discord.Interaction, user_bets_count: int = 0):
         super().__init__(timeout=180)
         self.user_id = user_id
         self.guild_id = guild_id
+        self.parent_interaction = parent_interaction
+
+        if user_bets_count >= 3:
+            self.bet_button.disabled = True
+            self.bet_button.label = "Límite de 3 alcanzado"
 
     @discord.ui.button(
         label="Elegir Número y Apostar",
@@ -3262,10 +3276,10 @@ class QuinielaView(discord.ui.View):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("¡Esta ventana no es tuya! 😅", ephemeral=True)
             return
-        await interaction.response.send_modal(QuinielaBetModal(self.guild_id))
+        await interaction.response.send_modal(QuinielaBetModal(self.guild_id, parent_interaction=self.parent_interaction))
 
     @discord.ui.button(
-        label="Cancelar",
+        label="Cerrar",
         emoji="❌",
         style=discord.ButtonStyle.secondary,
         custom_id="quiniela:cancel",
@@ -3274,12 +3288,11 @@ class QuinielaView(discord.ui.View):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("¡Esta ventana no es tuya! 😅", ephemeral=True)
             return
-        embed = discord.Embed(
-            title="🎱 Quiniela cerrada",
-            description="No se realizó ninguna apuesta. ¡Podés volver cuando quieras!",
-            color=discord.Color.dark_grey(),
-        )
-        await interaction.response.edit_message(embed=embed, view=None, attachments=[])
+        try:
+            await interaction.response.defer()
+            await interaction.delete_original_response()
+        except Exception:
+            pass
 
 
 async def start_quiniela_session(interaction: discord.Interaction):
@@ -3303,20 +3316,43 @@ async def start_quiniela_session(interaction: discord.Interaction):
     if not tabla_path.exists():
         tabla_path = ROOT / "assets" / "quiniela" / "banner.png"
 
+    user_bets = get_user_quiniela_bets(interaction.guild_id, interaction.user.id)
+    bets_count = len(user_bets)
+
+    if user_bets:
+        bets_lines = []
+        for b in user_bets:
+            num = b["number"]
+            info = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
+            potencial = b["bet_amount"] * 35
+            bets_lines.append(f"• **`{num:02d}` — {info['name']} {info['emoji']}** (`{money(b['bet_amount'])}`) ➔ Cobrás **{money(potencial)}**")
+        bets_text = f"🎟️ **Tus apuestas para hoy ({bets_count}/3):**\n" + "\n".join(bets_lines) + "\n\n"
+    else:
+        bets_text = "🎟️ **Tus apuestas para hoy (0/3):** *Aún no jugaste ningún número hoy.*\n\n"
+
+    limit_note = "*(⚠️ Ya completaste tus 3 jugadas permitidas para el sorteo de hoy)*\n\n" if bets_count >= 3 else ""
+
     embed = discord.Embed(
         title="🎱 Quiniela del Kiosquito — ¡Apostá a tu Número! 🍀",
         description=(
             "¡Elegí tu número de la suerte del **1 al 50** para el sorteo diario de las **22:00 hs**!\n\n"
+            f"{bets_text}"
+            f"{limit_note}"
             "🏆 **Tabla de Pagos:**\n"
             "• 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** tu apuesta.\n"
             "• 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** tu apuesta.\n\n"
-            f"💼 **Tu saldo actual:** **{money(user['money'])}** • Apuestas: `$100 – $1.000`\n"
+            f"💼 **Tu saldo actual:** **{money(user['money'])}** • Apuestas: `$100 – $1.000` (Máx 3 jugadas)\n"
             "🔔 *Al apostar se te asignará el rol `@Quinielero` para recibir la notificación del sorteo.*"
         ),
         color=discord.Color.gold(),
     )
 
-    view = QuinielaView(user_id=interaction.user.id, guild_id=interaction.guild_id)
+    view = QuinielaView(
+        user_id=interaction.user.id,
+        guild_id=interaction.guild_id,
+        parent_interaction=interaction,
+        user_bets_count=bets_count,
+    )
 
     if tabla_path.exists():
         file = discord.File(str(tabla_path), filename="tabla_quiniela.jpg")
