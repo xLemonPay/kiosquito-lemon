@@ -38,6 +38,10 @@
   - 💎 **`💎 💎 💎` (8%):** Ganás **$3.500** en efectivo.
   - 🍫 **`🍫 🍫 🍫` (12%):** Ganás **$1.500** + 1 Alfajor Jorgito a tu mochila.
   - ❌ **Sin Premio (78%):** Se suman **+$400** al Pozo Acumulado.
+- `/quiniela [numero] [apuesta]` — Apostar a un número de la suerte (del 1 al 50) para el sorteo diario de las 21:00 hs.
+  - 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** la apuesta.
+  - 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** la apuesta.
+  - 🔔 Asigna el rol `@Quinielero` automáticamente para notificar en el sorteo en vivo.
 
 ## 💵 Economía y Progresión
 - `/perfil [usuario]` — Saldo en billetera, XP acumulada, deuda y barra de progreso del fiado.
@@ -60,6 +64,8 @@
 - `/admin_dar_xp <usuario> <cantidad>` — Modifica la XP de un usuario.
 - `/admin_resetear <usuario>` — Resetea los datos e inventario de un usuario.
 - `/autolimpieza <activado:True/False>` — Activa o desactiva el borrado automático de mensajes comunes en el canal del kiosco.
+- `/admin_sortear_quiniela [privado:True/False]` — Forzar o probar el sorteo de la Quiniela en vivo con animación de bolillero.
+- `/admin_quiniela_automatica <activado:True/False>` — Activa o desactiva los sorteos y avisos automáticos de las 21:00 hs.
 
 ## 💬 Experiencia Automática
 - Los usuarios reciben entre 3 y 7 XP al participar activamente en el chat (con un cooldown de 1 minuto).

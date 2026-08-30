@@ -661,6 +661,19 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS quiniela_bets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                number INTEGER NOT NULL,
+                bet_amount INTEGER NOT NULL,
+                created_at INTEGER NOT NULL
+            )
+            """
+        )
+
 
 def get_setting(guild_id: int, key: str, default: str = "0") -> str:
     with get_connection() as conn:
@@ -986,6 +999,114 @@ def add_inventory_item(guild_id: int, user_id: int, product_id: str, quantity: i
             """,
             (guild_id, user_id, product_id, quantity),
         )
+
+
+QUINIELA_NUMBERS = {
+    1: {"name": "El Agua", "emoji": "💧"},
+    2: {"name": "El Niño", "emoji": "👦"},
+    3: {"name": "El Trébol", "emoji": "☘️"},
+    4: {"name": "La Cama", "emoji": "🛏️"},
+    5: {"name": "El Gato", "emoji": "🐈"},
+    6: {"name": "El Perro", "emoji": "🐕"},
+    7: {"name": "El Revólver", "emoji": "🔫"},
+    8: {"name": "El Incendio", "emoji": "🔥"},
+    9: {"name": "El Arroyo", "emoji": "🌊"},
+    10: {"name": "La Leche", "emoji": "🥛"},
+    11: {"name": "El Minero", "emoji": "⛏️"},
+    12: {"name": "El Soldado", "emoji": "💂"},
+    13: {"name": "La Yeta", "emoji": "🍀"},
+    14: {"name": "El Borracho", "emoji": "🥴"},
+    15: {"name": "La Niña Bonita", "emoji": "👧"},
+    16: {"name": "El Anillo", "emoji": "💍"},
+    17: {"name": "La Desgracia", "emoji": "💔"},
+    18: {"name": "La Sangre", "emoji": "🩸"},
+    19: {"name": "El Pescado", "emoji": "🐟"},
+    20: {"name": "La Fiesta", "emoji": "🥳"},
+    21: {"name": "La Mujer", "emoji": "👩"},
+    22: {"name": "El Loco", "emoji": "🤪"},
+    23: {"name": "El Cocinero", "emoji": "👨‍🍳"},
+    24: {"name": "El Caballo", "emoji": "🐎"},
+    25: {"name": "La Gallina", "emoji": "🐓"},
+    26: {"name": "La Misa", "emoji": "⛪"},
+    27: {"name": "El Peine", "emoji": "🪮"},
+    28: {"name": "El Cerro", "emoji": "⛰️"},
+    29: {"name": "San Pedro", "emoji": "🔑"},
+    30: {"name": "Santa Rosa", "emoji": "🌹"},
+    31: {"name": "La Luz", "emoji": "💡"},
+    32: {"name": "El Dinero", "emoji": "💵"},
+    33: {"name": "Cristo", "emoji": "✝️"},
+    34: {"name": "La Cabeza", "emoji": "🗣️"},
+    35: {"name": "El Pajarito", "emoji": "🐦"},
+    36: {"name": "La Manteca", "emoji": "🧈"},
+    37: {"name": "El Dentista", "emoji": "🦷"},
+    38: {"name": "El Aceite", "emoji": "🫒"},
+    39: {"name": "La Lluvia", "emoji": "🌧️"},
+    40: {"name": "El Cura", "emoji": "⛪"},
+    41: {"name": "El Cuchillo", "emoji": "🔪"},
+    42: {"name": "Las Zapatillas", "emoji": "👟"},
+    43: {"name": "El Balcón", "emoji": "🏢"},
+    44: {"name": "La Cárcel", "emoji": "⛓️"},
+    45: {"name": "El Vino", "emoji": "🍷"},
+    46: {"name": "El Tomate", "emoji": "🍅"},
+    47: {"name": "El Muerto", "emoji": "💀"},
+    48: {"name": "El Muerto que habla", "emoji": "🗣️"},
+    49: {"name": "La Carne", "emoji": "🥩"},
+    50: {"name": "El Pan", "emoji": "🥖"},
+}
+
+
+def record_quiniela_bet(guild_id: int, user_id: int, number: int, amount: int) -> None:
+    now = int(time.time())
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO quiniela_bets (guild_id, user_id, number, bet_amount, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (guild_id, user_id, number, amount, now),
+        )
+
+
+def get_active_quiniela_bets(guild_id: int) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM quiniela_bets WHERE guild_id=?",
+            (guild_id,),
+        ).fetchall()
+
+
+def clear_quiniela_bets(guild_id: int) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM quiniela_bets WHERE guild_id=?", (guild_id,))
+
+
+async def get_or_create_quinielero_role(guild: discord.Guild) -> discord.Role | None:
+    for r in guild.roles:
+        if "quinielero" in r.name.lower():
+            return r
+    try:
+        return await guild.create_role(
+            name="Quinielero",
+            color=discord.Color.gold(),
+            mentionable=True,
+            reason="Rol para participantes de la Quiniela del Kiosquito",
+        )
+    except Exception as e:
+        print(f"Aviso al crear rol Quinielero: {e}")
+        return None
+
+
+async def schedule_quinielero_role_removal(guild: discord.Guild, role: discord.Role, user_ids: list[int], delay_seconds: int = 1200):
+    await asyncio.sleep(delay_seconds)
+    for uid in user_ids:
+        try:
+            member = guild.get_member(uid)
+            if not member:
+                member = await guild.fetch_member(uid)
+            if member and role in member.roles:
+                await member.remove_roles(role, reason="Fin del sorteo de Quiniela (20 min cumplidos)")
+        except Exception:
+            pass
 
 
 def manual_open_status(guild_id: int) -> tuple[bool, int | None]:
@@ -3018,6 +3139,336 @@ async def start_raspadita_session(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
+class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
+    def __init__(self, guild_id: int):
+        super().__init__()
+        self.guild_id = guild_id
+
+    numero_input = discord.ui.TextInput(
+        label="Número de la suerte (del 1 al 50)",
+        placeholder="Ej: 22 (El Loco), 07 (El Revólver), etc.",
+        min_length=1,
+        max_length=2,
+        required=True,
+    )
+
+    apuesta_input = discord.ui.TextInput(
+        label="Monto a apostar ($100 a $1.000)",
+        placeholder="Ej: 500",
+        min_length=3,
+        max_length=5,
+        required=True,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            num = int(self.numero_input.value.strip())
+        except ValueError:
+            await interaction.response.send_message("❌ El número debe ser un valor numérico entre **1 y 50**.", ephemeral=True)
+            return
+
+        if num < 1 or num > 50:
+            await interaction.response.send_message("❌ El número de la Quiniela debe estar entre **1 y 50**.", ephemeral=True)
+            return
+
+        try:
+            apuesta = int(self.apuesta_input.value.strip().replace("$", "").replace(".", ""))
+        except ValueError:
+            await interaction.response.send_message("❌ El monto a apostar debe ser un número válido.", ephemeral=True)
+            return
+
+        if apuesta < 100 or apuesta > 1000:
+            await interaction.response.send_message("❌ La apuesta mínima es de **$100** y la máxima de **$1.000**.", ephemeral=True)
+            return
+
+        user = get_user(self.guild_id, interaction.user.id)
+        if user["money"] < apuesta:
+            await interaction.response.send_message(
+                f"💸 No te alcanza la plata. Tu saldo actual es de **{money(user['money'])}** y querés apostar **{money(apuesta)}**.",
+                ephemeral=True,
+            )
+            return
+
+        # Descontar plata y registrar apuesta
+        with get_connection() as conn:
+            ensure_user(conn, self.guild_id, interaction.user.id)
+            conn.execute(
+                "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
+                (apuesta, self.guild_id, interaction.user.id),
+            )
+
+        record_quiniela_bet(self.guild_id, interaction.user.id, num, apuesta)
+
+        # Asignar rol Quinielero
+        quinielero_role = await get_or_create_quinielero_role(interaction.guild)
+        if quinielero_role and isinstance(interaction.user, discord.Member):
+            try:
+                await interaction.user.add_roles(quinielero_role, reason="Participante de la Quiniela")
+            except Exception:
+                pass
+
+        num_info = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
+        premio_potencial = apuesta * 35
+        premio_palo = apuesta * 2
+
+        embed = discord.Embed(
+            title="🎫 ¡Apuesta Registrada en la Quiniela! 🍀",
+            description=(
+                f"🧔 **El Kiosquero:** *«¡Anotado en la boleta, maestro! Mucha suerte hoy.»*\n\n"
+                f"🎱 **Tu Número:** **`{num:02d}` — {num_info['name']} {num_info['emoji']}**\n"
+                f"💵 **Tu Apuesta:** **{money(apuesta)}**\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🏆 **Premios Potenciales:**\n"
+                f"• 🎯 **Acierto a la cabeza (x35):** **+{money(premio_potencial)}**\n"
+                f"• 🤏 **Pegó en el palo (x2):** **+{money(premio_palo)}** *(si sale {num-1 if num>1 else 50} o {num+1 if num<50 else 1})*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "🔔 *Se te asignó el rol `@Quinielero`. Te avisaremos a las **21:00 hs** cuando arranque el sorteo en vivo.*"
+            ),
+            color=discord.Color.green(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class QuinielaView(discord.ui.View):
+    def __init__(self, user_id: int, guild_id: int):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.guild_id = guild_id
+
+    @discord.ui.button(
+        label="Elegir Número y Apostar",
+        emoji="🎫",
+        style=discord.ButtonStyle.success,
+        custom_id="quiniela:bet",
+    )
+    async def bet_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Esta ventana no es tuya! 😅", ephemeral=True)
+            return
+        await interaction.response.send_modal(QuinielaBetModal(self.guild_id))
+
+    @discord.ui.button(
+        label="Cancelar",
+        emoji="❌",
+        style=discord.ButtonStyle.secondary,
+        custom_id="quiniela:cancel",
+    )
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("¡Esta ventana no es tuya! 😅", ephemeral=True)
+            return
+        embed = discord.Embed(
+            title="🎱 Quiniela cerrada",
+            description="No se realizó ninguna apuesta. ¡Podés volver cuando quieras!",
+            color=discord.Color.dark_grey(),
+        )
+        await interaction.response.edit_message(embed=embed, view=None, attachments=[])
+
+
+async def start_quiniela_session(interaction: discord.Interaction):
+    user = get_user(interaction.guild_id, interaction.user.id)
+    if user["money"] < 100:
+        embed = discord.Embed(
+            title="🎱 Quiniela del Kiosquito 🍋",
+            description=(
+                "❌ **No tenés suficiente plata en tu billetera.**\n\n"
+                f"💵 **Apuesta mínima:** **$100**\n"
+                f"💼 Tu saldo actual: **{money(user['money'])}**\n\n"
+                "💡 *Hacé una changuita con `/changuitas` o pedí tu `/diario` para juntar plata.*"
+            ),
+            color=discord.Color.red(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
+        return
+
+    tabla_path = ROOT / "assets" / "quiniela" / "tabla_quiniela.jpg"
+    if not tabla_path.exists():
+        tabla_path = ROOT / "assets" / "quiniela" / "banner.png"
+
+    embed = discord.Embed(
+        title="🎱 Quiniela del Kiosquito — ¡Apostá a tu Número! 🍀",
+        description=(
+            "¡Elegí tu número de la suerte del **1 al 50** para el sorteo diario de las **21:00 hs**!\n\n"
+            "🏆 **Tabla de Pagos:**\n"
+            "• 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** tu apuesta.\n"
+            "• 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** tu apuesta.\n\n"
+            f"💼 **Tu saldo actual:** **{money(user['money'])}** • Apuestas: `$100 – $1.000`\n"
+            "🔔 *Al apostar se te asignará el rol `@Quinielero` para recibir la notificación del sorteo.*"
+        ),
+        color=discord.Color.gold(),
+    )
+
+    view = QuinielaView(user_id=interaction.user.id, guild_id=interaction.guild_id)
+
+    if tabla_path.exists():
+        file = discord.File(str(tabla_path), filename="tabla_quiniela.jpg")
+        embed.set_image(url="attachment://tabla_quiniela.jpg")
+        await interaction.response.send_message(embed=embed, view=view, file=file, ephemeral=True)
+    else:
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextChannel | None = None, is_private: bool = False):
+    channel = target_channel or await get_or_create_kiosk_channel(guild)
+    if not channel:
+        return
+
+    win_number = random.randint(1, 50)
+    info = QUINIELA_NUMBERS.get(win_number, {"name": f"Número {win_number}", "emoji": "🎱"})
+
+    bets = get_active_quiniela_bets(guild.id)
+    quinielero_role = None
+    for r in guild.roles:
+        if "quinielero" in r.name.lower():
+            quinielero_role = r
+            break
+
+    sorteando_path = ROOT / "assets" / "quiniela" / "sorteando.gif"
+    role_ping = quinielero_role.mention if (quinielero_role and not is_private) else "**[ MODO DE TEST / PRUEBA PRIVADA ]**"
+
+    initial_embed = discord.Embed(
+        title="🎱 ¡SORTEO OFICIAL DE LA QUINIELA DEL KIOSQUITO! 🎰",
+        description=(
+            f"{role_ping}\n\n"
+            "🧔 **El Kiosquero:** *«¡Atención a todos los vecinos! Hacemos girar el bolillero de metal...»*\n\n"
+            "⏳ *Las bolillas están dando vueltas en el aire a toda velocidad...*"
+        ),
+        color=discord.Color.gold(),
+    )
+
+    gif_file = discord.File(str(sorteando_path), filename="sorteando.gif") if sorteando_path.exists() else None
+    if gif_file:
+        initial_embed.set_image(url="attachment://sorteando.gif")
+
+    content_msg = quinielero_role.mention if (quinielero_role and not is_private) else None
+    if gif_file:
+        draw_msg = await channel.send(content=content_msg, embed=initial_embed, file=gif_file)
+    else:
+        draw_msg = await channel.send(content=content_msg, embed=initial_embed)
+
+    # Pausa de 3 segundos para suspenso y animación
+    await asyncio.sleep(3.0)
+
+    # Calcular ganadores
+    exact_winners = []
+    near_winners = []
+    total_distributed = 0
+    participant_user_ids = set()
+
+    for b in bets:
+        uid = b["user_id"]
+        bet_num = b["number"]
+        amount = b["bet_amount"]
+        participant_user_ids.add(uid)
+
+        if bet_num == win_number:
+            prize = amount * 35
+            exact_winners.append({"user_id": uid, "prize": prize, "bet": amount})
+            total_distributed += prize
+            with get_connection() as conn:
+                ensure_user(conn, guild.id, uid)
+                conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (prize, guild.id, uid))
+        elif abs(bet_num - win_number) == 1 or (bet_num == 1 and win_number == 50) or (bet_num == 50 and win_number == 1):
+            prize = amount * 2
+            near_winners.append({"user_id": uid, "prize": prize, "bet": amount, "number": bet_num})
+            total_distributed += prize
+            with get_connection() as conn:
+                ensure_user(conn, guild.id, uid)
+                conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (prize, guild.id, uid))
+
+    results_text = []
+    if exact_winners:
+        results_text.append("🏆 **¡ACIERTOS A LA CABEZA (x35)!** 🎯")
+        for w in exact_winners:
+            results_text.append(f"• 🥇 <@{w['user_id']}> jugó `{money(w['bet'])}` al **{win_number}** ➔ **¡COBRÓ {money(w['prize'])}!** 💸🍾")
+        results_text.append("")
+
+    if near_winners:
+        results_text.append("🤏 **¡PEGÓ EN EL PALO (x2)!**")
+        for w in near_winners:
+            results_text.append(f"• 🥈 <@{w['user_id']}> jugó `{money(w['bet'])}` al **{w['number']}** ➔ Cobró `{money(w['prize'])}` 🪙")
+        results_text.append("")
+
+    if not exact_winners and not near_winners:
+        results_text.append("❌ *¡La banca se quedó con todo! Ningún vecino acertó a este número hoy.*")
+
+    results_text.append(f"\n💰 **Total entregado en premios:** `{money(total_distributed)}`")
+
+    result_img_path = ROOT / "assets" / "quiniela" / "resultados" / f"{win_number}.png"
+    final_embed = discord.Embed(
+        title=f"🎱 ¡SALIÓ EL {win_number:02d} — {info['name'].upper()} {info['emoji']}! 🏆",
+        description="\n".join(results_text),
+        color=discord.Color.green() if (exact_winners or near_winners) else discord.Color.gold(),
+    )
+    final_embed.set_footer(text=f"Sorteo Oficial de la Quiniela • Hora Argentina {datetime.now(TZ).strftime('%H:%M')}")
+
+    result_file = discord.File(str(result_img_path), filename=f"{win_number}.png") if result_img_path.exists() else None
+    if result_file:
+        final_embed.set_image(url=f"attachment://{win_number}.png")
+
+    try:
+        if result_file:
+            await channel.send(embed=final_embed, file=result_file)
+        else:
+            await channel.send(embed=final_embed)
+    except Exception as e:
+        print(f"Error publicando resultado final de la quiniela: {e}")
+
+    # Limpiar apuestas del sorteo
+    clear_quiniela_bets(guild.id)
+
+    # Quitar rol Quinielero a los 20 minutos
+    if participant_user_ids and quinielero_role:
+        asyncio.create_task(schedule_quinielero_role_removal(guild, quinielero_role, list(participant_user_ids), 1200))
+
+
+async def send_quiniela_announcement_20m(guild: discord.Guild):
+    channel = await get_or_create_kiosk_channel(guild)
+    if not channel:
+        return
+    banner_path = ROOT / "assets" / "quiniela" / "banner.png"
+    embed = discord.Embed(
+        title="🎱 ¡QUEDAN 20 MINUTOS PARA EL SORTEO DE LA QUINIELA! ⏳",
+        description=(
+            "🧔 **El Kiosquero:** *«¡Se van cerrando las apuestas de la noche! Elegí tu número del **01 al 50**.»*\n\n"
+            "🏆 **Premios:** Acierto a la cabeza paga **x35 veces** tu apuesta • Pegó en el palo paga **x2**.\n"
+            "👉 Jugá con `/quiniela [numero] [apuesta]` o tocá el botón **`🎱 Quiniela`** en el mostrador."
+        ),
+        color=discord.Color.gold(),
+    )
+    if banner_path.exists():
+        file = discord.File(str(banner_path), filename="banner.png")
+        embed.set_image(url="attachment://banner.png")
+        await channel.send(embed=embed, file=file)
+    else:
+        await channel.send(embed=embed)
+
+
+async def send_quiniela_announcement_5m(guild: discord.Guild):
+    channel = await get_or_create_kiosk_channel(guild)
+    if not channel:
+        return
+    quinielero_role = None
+    for r in guild.roles:
+        if "quinielero" in r.name.lower():
+            quinielero_role = r
+            break
+    ping = quinielero_role.mention if quinielero_role else None
+    embed = discord.Embed(
+        title="🔔 ¡ÚLTIMOS 5 MINUTOS PARA EL SORTEO! 🎱",
+        description=(
+            "⏳ *¡En 5 minutos el Kiosquero hace girar el bolillero en vivo!*\n"
+            "Última oportunidad para meter tu jugada de la noche."
+        ),
+        color=discord.Color.gold(),
+    )
+    if ping:
+        await channel.send(content=ping, embed=embed)
+    else:
+        await channel.send(embed=embed)
+
+
 class ChanguitaSelect(discord.ui.Select):
     def __init__(self, sample_jobs: list[dict]):
         options = []
@@ -3522,6 +3973,15 @@ class PersistentKioskView(discord.ui.View):
         await start_raspadita_session(interaction)
 
     @discord.ui.button(
+        label="Quiniela",
+        emoji="🎱",
+        style=discord.ButtonStyle.primary,
+        custom_id="kiosk:quiniela",
+    )
+    async def quiniela_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await start_quiniela_session(interaction)
+
+    @discord.ui.button(
         label="Mi Mochila",
         emoji="🎒",
         style=discord.ButtonStyle.secondary,
@@ -3832,7 +4292,7 @@ async def on_message(message: discord.Message):
 
 @tasks.loop(minutes=1)
 async def presence_loop():
-    """Bucle sincronizado con la hora argentina para verificar aperturas, cierres, presencia y reposición."""
+    """Bucle sincronizado con la hora argentina para verificar aperturas, cierres, presencia, reposición y quiniela."""
     now = datetime.now(TZ)
 
     for guild in bot.guilds:
@@ -3850,6 +4310,26 @@ async def presence_loop():
             # Reposición periódica de stock cada 30 min mientras está abierto
             restock_kiosk(guild.id)
             await update_kiosk_fixed_message(guild, repost=False)
+
+        # Verificación de Quiniela Automática (Solo si el admin la activó con quiniela_auto_enabled == "1"):
+        auto_quiniela = get_setting(guild.id, "quiniela_auto_enabled", "0") == "1"
+        if auto_quiniela:
+            today_str = now.strftime("%Y-%m-%d")
+            if now.hour == 20 and now.minute == 40:
+                last_20m = get_setting(guild.id, "last_quiniela_20m_date", "")
+                if last_20m != today_str:
+                    set_setting(guild.id, "last_quiniela_20m_date", today_str)
+                    await send_quiniela_announcement_20m(guild)
+            elif now.hour == 20 and now.minute == 55:
+                last_5m = get_setting(guild.id, "last_quiniela_5m_date", "")
+                if last_5m != today_str:
+                    set_setting(guild.id, "last_quiniela_5m_date", today_str)
+                    await send_quiniela_announcement_5m(guild)
+            elif now.hour == 21 and now.minute == 0:
+                last_draw = get_setting(guild.id, "last_quiniela_draw_date", "")
+                if last_draw != today_str:
+                    set_setting(guild.id, "last_quiniela_draw_date", today_str)
+                    await run_quiniela_draw(guild)
 
     manually_open = any(
         manual_open_status(guild.id)[0]
@@ -4663,6 +5143,93 @@ async def autolimpieza_cmd(interaction: discord.Interaction, activado: bool):
     )
 
 
+@bot.tree.command(name="quiniela", description="Jugar tu número de la suerte en la Quiniela del Kiosquito.")
+@app_commands.describe(
+    numero="Número al que apostar (del 1 al 50)",
+    apuesta="Monto a apostar ($100 a $1.000)",
+)
+@app_commands.guild_only()
+async def quiniela_cmd(
+    interaction: discord.Interaction,
+    numero: app_commands.Range[int, 1, 50] | None = None,
+    apuesta: app_commands.Range[int, 100, 1000] | None = None,
+):
+    if numero is None or apuesta is None:
+        await start_quiniela_session(interaction)
+        return
+
+    user = get_user(interaction.guild_id, interaction.user.id)
+    if user["money"] < apuesta:
+        await interaction.response.send_message(
+            f"💸 No te alcanza la plata. Tenés **{money(user['money'])}** y querés apostar **{money(apuesta)}**.",
+            ephemeral=True,
+        )
+        return
+
+    with get_connection() as conn:
+        ensure_user(conn, interaction.guild_id, interaction.user.id)
+        conn.execute(
+            "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
+            (apuesta, interaction.guild_id, interaction.user.id),
+        )
+
+    record_quiniela_bet(interaction.guild_id, interaction.user.id, numero, apuesta)
+
+    quinielero_role = await get_or_create_quinielero_role(interaction.guild)
+    if quinielero_role and isinstance(interaction.user, discord.Member):
+        try:
+            await interaction.user.add_roles(quinielero_role, reason="Participante de la Quiniela")
+        except Exception:
+            pass
+
+    num_info = QUINIELA_NUMBERS.get(numero, {"name": f"Número {numero}", "emoji": "🎱"})
+    premio_potencial = apuesta * 35
+    premio_palo = apuesta * 2
+
+    embed = discord.Embed(
+        title="🎫 ¡Apuesta Registrada en la Quiniela! 🍀",
+        description=(
+            f"🧔 **El Kiosquero:** *«¡Anotado en la boleta, maestro! Mucha suerte hoy.»*\n\n"
+            f"🎱 **Tu Número:** **`{numero:02d}` — {num_info['name']} {num_info['emoji']}**\n"
+            f"💵 **Tu Apuesta:** **{money(apuesta)}**\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🏆 **Premios Potenciales:**\n"
+            f"• 🎯 **Acierto a la cabeza (x35):** **+{money(premio_potencial)}**\n"
+            f"• 🤏 **Pegó en el palo (x2):** **+{money(premio_palo)}** *(si sale {numero-1 if numero>1 else 50} o {numero+1 if numero<50 else 1})*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🔔 *Se te asignó el rol `@Quinielero`. Te avisaremos a las **21:00 hs** cuando arranque el sorteo en vivo.*"
+        ),
+        color=discord.Color.green(),
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="admin_sortear_quiniela", description="[Admin] Forzar o probar el sorteo de la Quiniela en vivo.")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(privado="True para no arrobar a nadie (modo test), False para hacer el sorteo oficial con mención.")
+@app_commands.guild_only()
+async def admin_sortear_quiniela_cmd(interaction: discord.Interaction, privado: bool = True):
+    await interaction.response.send_message("🎰 **Iniciando sorteo de la Quiniela...**", ephemeral=True)
+    await run_quiniela_draw(interaction.guild, target_channel=interaction.channel, is_private=privado)
+
+
+@bot.tree.command(name="admin_quiniela_automatica", description="[Admin] Activar o desactivar los anuncios y sorteos automáticos a las 21:00 hs.")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(activado="True para activar sorteos automáticos diarios, False para dejarlos en modo manual/test.")
+@app_commands.guild_only()
+async def admin_quiniela_automatica_cmd(interaction: discord.Interaction, activado: bool):
+    set_setting(interaction.guild_id, "quiniela_auto_enabled", "1" if activado else "0")
+    status = (
+        "🟢 **ACTIVADA** (el bot publicará anuncios a las 20:40 y 20:55, y sorteará en vivo a las 21:00 hs)"
+        if activado
+        else "🔴 **DESACTIVADA (MODO TEST)** (no se enviará ningún aviso automático; solo se sortea manualmente con `/admin_sortear_quiniela`)"
+    )
+    await interaction.response.send_message(
+        f"🎱 **Quiniela Automática:** {status}.",
+        ephemeral=True,
+    )
+
+
 # ---------- AUTOCOMPLETES DINÁMICOS ----------
 
 async def product_autocomplete(interaction: discord.Interaction, current: str):
@@ -4701,10 +5268,22 @@ async def consumir_autocomplete(interaction: discord.Interaction, current: str):
     return choices[:25]
 
 
+async def quiniela_autocomplete(interaction: discord.Interaction, current: str):
+    current = current.lower().strip()
+    choices = []
+    for num, info in QUINIELA_NUMBERS.items():
+        label = f"{num:02d} — {info['name']} {info['emoji']}"
+        searchable = f"{num} {num:02d} {info['name']}".lower()
+        if not current or current in searchable:
+            choices.append(app_commands.Choice(name=label[:100], value=num))
+    return choices[:25]
+
+
 comprar.autocomplete("producto")(product_autocomplete)
 fiado.autocomplete("producto")(product_autocomplete)
 regalar.autocomplete("producto")(product_autocomplete)
 consumir.autocomplete("producto")(consumir_autocomplete)
+quiniela_cmd.autocomplete("numero")(quiniela_autocomplete)
 
 
 # ---------- MANEJO DE ERRORES ----------
