@@ -2657,39 +2657,34 @@ class RaspaditaGameView(discord.ui.View):
         self.revealed_indices = []
         self.game_over = False
 
-        # Probabilidades reducidas:
+        # Probabilidades:
         # 2% -> Pozo Acumulado (🍋)
         # 8% -> Diamantes $3.500 (💎)
         # 12% -> Golosinas $1.500 + Alfajor (🍫)
         # 78% -> Sin premio
         roll = random.random()
         if roll < 0.02:
-            target = "🍋"
+            self.win_type = "🍋"
         elif roll < 0.10:
-            target = "💎"
+            self.win_type = "💎"
         elif roll < 0.22:
-            target = "🍫"
+            self.win_type = "🍫"
         else:
-            target = None
+            self.win_type = None
 
-        if target:
-            board = [target, target, target]
-            other_pool = [x for x in ["🍋", "💎", "🍫", "💩", "🍂", "🧻", "🪙"] if x != target]
-            extras = []
-            for sym in other_pool:
-                extras.extend([sym, sym])
-            random.shuffle(extras)
-            board.extend(extras[:6])
-        else:
-            symbols = ["🍋", "💎", "🍫", "💩", "🍂", "🧻", "🪙"]
-            board = []
-            for s in symbols:
-                board.extend([s, s])
-            random.shuffle(board)
-            board = board[:9]
+        if self.win_type is None:
+            self.player_loss_symbols = random.choice([
+                ["💎", "💎", "🍂"],
+                ["🍋", "🍋", "💩"],
+                ["🍫", "🍫", "🧻"],
+                ["💎", "🍂", "💩"],
+                ["🍋", "🪙", "🧻"],
+                ["🍫", "🪙", "🍂"],
+                ["🪙", "🪙", "💩"],
+            ])
+            self.missed_prize_symbol = random.choice(["💎", "🍫", "🍋"])
 
-        random.shuffle(board)
-        self.board = board
+        self.board = [None] * 9
         self.build_grid()
 
     def build_grid(self):
@@ -2697,7 +2692,7 @@ class RaspaditaGameView(discord.ui.View):
         for idx in range(9):
             row = idx // 3
             if idx in self.revealed_indices or self.game_over:
-                sym = self.board[idx]
+                sym = self.board[idx] or "❓"
                 style = discord.ButtonStyle.success if sym in ("🍋", "💎", "🍫") else discord.ButtonStyle.secondary
                 btn = discord.ui.Button(label=sym, style=style, disabled=True, row=row)
             else:
@@ -2709,7 +2704,7 @@ class RaspaditaGameView(discord.ui.View):
         jackpot = get_raspadita_jackpot(self.guild_id)
         scratched_count = len(self.revealed_indices)
 
-        revealed_symbols = [self.board[i] for i in self.revealed_indices]
+        revealed_symbols = [self.board[i] for i in self.revealed_indices if self.board[i] is not None]
         slots = []
         for i in range(3):
             if i < len(revealed_symbols):
@@ -2747,12 +2742,36 @@ class RaspaditaGameView(discord.ui.View):
             self.revealed_indices.append(idx)
             scratched = len(self.revealed_indices)
 
+            if self.win_type is not None:
+                self.board[idx] = self.win_type
+            else:
+                self.board[idx] = self.player_loss_symbols[scratched - 1]
+
             if scratched < 3:
                 self.build_grid()
                 await interaction.response.edit_message(embed=self.build_embed(), view=self)
                 return
 
             self.game_over = True
+            unpicked = [i for i in range(9) if i not in self.revealed_indices]
+            random.shuffle(unpicked)
+
+            if self.win_type is not None:
+                other_pool = [x for x in ["🍋", "💎", "🍫", "💩", "🍂", "🧻", "🪙"] if x != self.win_type]
+                extras = []
+                for s in other_pool:
+                    extras.extend([s, s])
+                random.shuffle(extras)
+                for i, u_idx in enumerate(unpicked):
+                    self.board[u_idx] = extras[i]
+            else:
+                for u_idx in unpicked[:3]:
+                    self.board[u_idx] = self.missed_prize_symbol
+                filler = [x for x in ["💩", "🍂", "🧻", "🪙", "🍫", "💎"] if x != self.missed_prize_symbol]
+                random.shuffle(filler)
+                for i, u_idx in enumerate(unpicked[3:]):
+                    self.board[u_idx] = filler[i]
+
             c1 = self.board[self.revealed_indices[0]]
             c2 = self.board[self.revealed_indices[1]]
             c3 = self.board[self.revealed_indices[2]]
@@ -2849,6 +2868,7 @@ class RaspaditaGameView(discord.ui.View):
                 user = get_user(self.guild_id, self.user_id)
 
                 self.build_grid()
+                missed_emoji = self.missed_prize_symbol
                 embed = discord.Embed(
                     title="❌ ¡Siga participando! No hubo suerte",
                     description=(
