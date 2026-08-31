@@ -1114,6 +1114,26 @@ def record_quiniela_history(guild_id: int, win_number: int) -> None:
     set_setting(guild_id, "quiniela_history", json.dumps(history))
 
 
+async def resolve_member_name(guild: discord.Guild, user_id: int) -> str:
+    """Obtiene el nombre real o tag de un usuario evitando el problema de cache vacío."""
+    m = guild.get_member(user_id)
+    if m:
+        return m.display_name or m.name
+    try:
+        m = await guild.fetch_member(user_id)
+        if m:
+            return m.display_name or m.name
+    except Exception:
+        pass
+    try:
+        u = await bot.fetch_user(user_id)
+        if u:
+            return u.display_name or u.name
+    except Exception:
+        pass
+    return f"Vecino_{user_id % 1000:03d}"
+
+
 async def get_or_create_quinielero_role(guild: discord.Guild) -> discord.Role | None:
     for r in guild.roles:
         if "quinielero" in r.name.lower():
@@ -3480,17 +3500,15 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
     if exact_winners:
         results_text.append("🏆 **¡ACIERTOS A LA CABEZA (x35)!** 🎯")
         for w in exact_winners:
-            m = guild.get_member(w['user_id'])
-            uname = m.display_name if m else "Vecino"
-            results_text.append(f"• 🥇 **{uname}** jugó `{money(w['bet'])}` al **{win_number}** ➔ **¡COBRÓ {money(w['prize'])}!** 💸🍾")
+            uname = await resolve_member_name(guild, w['user_id'])
+            results_text.append(f"• 🥇 **@{uname}** jugó `{money(w['bet'])}` al **{win_number}** ➔ **¡COBRÓ {money(w['prize'])}!** 💸🍾")
         results_text.append("")
 
     if near_winners:
         results_text.append("🤏 **¡PEGÓ EN EL PALO (x2)!**")
         for w in near_winners:
-            m = guild.get_member(w['user_id'])
-            uname = m.display_name if m else "Vecino"
-            results_text.append(f"• 🥈 **{uname}** jugó `{money(w['bet'])}` al **{w['number']}** ➔ Cobró `{money(w['prize'])}` 🪙")
+            uname = await resolve_member_name(guild, w['user_id'])
+            results_text.append(f"• 🥈 **@{uname}** jugó `{money(w['bet'])}` al **{w['number']}** ➔ Cobró `{money(w['prize'])}` 🪙")
         results_text.append("")
 
     if not exact_winners and not near_winners:
@@ -3498,12 +3516,12 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
 
     results_text.append(f"\n💰 **Total entregado en premios:** `{money(total_distributed)}`")
 
-    # Lista de todos los que participaron hoy (sin arrobar)
+    # Lista de todos los usuarios únicos que participaron hoy (mostrando su @tag sin arrobar con sonido)
     if participant_user_ids:
         p_names = []
-        for p_uid in participant_user_ids:
-            m = guild.get_member(p_uid)
-            p_names.append(f"**{m.display_name}**" if m else "**Vecino**")
+        for p_uid in set(participant_user_ids):
+            uname = await resolve_member_name(guild, p_uid)
+            p_names.append(f"**@{uname}**")
         results_text.append(f"👥 **Participantes de hoy ({len(p_names)}):** " + ", ".join(p_names))
 
     # Mostrar historial de últimos números
