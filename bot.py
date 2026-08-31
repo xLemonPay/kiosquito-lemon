@@ -3480,19 +3480,31 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
     if exact_winners:
         results_text.append("🏆 **¡ACIERTOS A LA CABEZA (x35)!** 🎯")
         for w in exact_winners:
-            results_text.append(f"• 🥇 <@{w['user_id']}> jugó `{money(w['bet'])}` al **{win_number}** ➔ **¡COBRÓ {money(w['prize'])}!** 💸🍾")
+            m = guild.get_member(w['user_id'])
+            uname = m.display_name if m else "Vecino"
+            results_text.append(f"• 🥇 **{uname}** jugó `{money(w['bet'])}` al **{win_number}** ➔ **¡COBRÓ {money(w['prize'])}!** 💸🍾")
         results_text.append("")
 
     if near_winners:
         results_text.append("🤏 **¡PEGÓ EN EL PALO (x2)!**")
         for w in near_winners:
-            results_text.append(f"• 🥈 <@{w['user_id']}> jugó `{money(w['bet'])}` al **{w['number']}** ➔ Cobró `{money(w['prize'])}` 🪙")
+            m = guild.get_member(w['user_id'])
+            uname = m.display_name if m else "Vecino"
+            results_text.append(f"• 🥈 **{uname}** jugó `{money(w['bet'])}` al **{w['number']}** ➔ Cobró `{money(w['prize'])}` 🪙")
         results_text.append("")
 
     if not exact_winners and not near_winners:
         results_text.append("❌ *¡La banca se quedó con todo! Ningún vecino acertó a este número hoy.*")
 
     results_text.append(f"\n💰 **Total entregado en premios:** `{money(total_distributed)}`")
+
+    # Lista de todos los que participaron hoy (sin arrobar)
+    if participant_user_ids:
+        p_names = []
+        for p_uid in participant_user_ids:
+            m = guild.get_member(p_uid)
+            p_names.append(f"**{m.display_name}**" if m else "**Vecino**")
+        results_text.append(f"👥 **Participantes de hoy ({len(p_names)}):** " + ", ".join(p_names))
 
     # Mostrar historial de últimos números
     recent_history = get_quiniela_history(guild.id)
@@ -3501,7 +3513,7 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
         for num in recent_history:
             inf = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
             hist_parts.append(f"**`{num:02d}`** {inf['emoji']}")
-        results_text.append(f"\n📜 **Últimos resultados:** " + " • ".join(hist_parts))
+        results_text.append(f"📜 **Últimos resultados:** " + " • ".join(hist_parts))
 
     result_img_path = ROOT / "assets" / "quiniela" / "resultados" / f"{win_number}.png"
     final_embed = discord.Embed(
@@ -3523,10 +3535,11 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
             pass
 
     try:
+        no_mentions = discord.AllowedMentions.none()
         if result_file:
-            res_msg = await channel.send(embed=final_embed, file=result_file)
+            res_msg = await channel.send(embed=final_embed, file=result_file, allowed_mentions=no_mentions)
         else:
-            res_msg = await channel.send(embed=final_embed)
+            res_msg = await channel.send(embed=final_embed, allowed_mentions=no_mentions)
         record_consumption_message(guild.id, channel.id, res_msg.id)
         # El resultado permanece 10 minutos (600 seg) y se borra automáticamente para mantener limpio el kiosco:
         asyncio.create_task(auto_delete_message(res_msg, 600))
