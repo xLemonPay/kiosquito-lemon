@@ -568,6 +568,15 @@ async def auto_delete_interaction(interaction: discord.Interaction, delay: int =
         pass
 
 
+async def auto_delete_message(message: discord.Message, delay: int = 600):
+    """Borra un mensaje luego del tiempo especificado (default 10 min = 600 seg)."""
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+    except (discord.NotFound, discord.HTTPException):
+        pass
+
+
 # ---------- BASE DE DATOS Y PERSISTENCIA ----------
 
 def get_connection() -> sqlite3.Connection:
@@ -1086,6 +1095,23 @@ def get_user_quiniela_bets(guild_id: int, user_id: int) -> list[sqlite3.Row]:
 def clear_quiniela_bets(guild_id: int) -> None:
     with get_connection() as conn:
         conn.execute("DELETE FROM quiniela_bets WHERE guild_id=?", (guild_id,))
+
+
+def get_quiniela_history(guild_id: int) -> list[int]:
+    raw = get_setting(guild_id, "quiniela_history", "[]")
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [int(x) for x in data if 1 <= int(x) <= 50][:3]
+    except Exception:
+        pass
+    return []
+
+
+def record_quiniela_history(guild_id: int, win_number: int) -> None:
+    history = get_quiniela_history(guild_id)
+    history = [win_number] + history[:2]
+    set_setting(guild_id, "quiniela_history", json.dumps(history))
 
 
 async def get_or_create_quinielero_role(guild: discord.Guild) -> discord.Role | None:
@@ -3332,12 +3358,23 @@ async def start_quiniela_session(interaction: discord.Interaction):
 
     limit_note = "*(⚠️ Ya completaste tus 3 jugadas permitidas para el sorteo de hoy)*\n\n" if bets_count >= 3 else ""
 
+    recent_history = get_quiniela_history(interaction.guild_id)
+    if recent_history:
+        hist_parts = []
+        for num in recent_history:
+            inf = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
+            hist_parts.append(f"**`{num:02d}`** *({inf['name']} {inf['emoji']})*")
+        history_text = f"📜 **Últimos 3 números salidos:** " + " • ".join(hist_parts) + "\n\n"
+    else:
+        history_text = ""
+
     embed = discord.Embed(
         title="🎱 Quiniela del Kiosquito — ¡Apostá a tu Número! 🍀",
         description=(
             "¡Elegí tu número de la suerte del **1 al 50** para el sorteo diario de las **22:00 hs**!\n\n"
             f"{bets_text}"
             f"{limit_note}"
+            f"{history_text}"
             "🏆 **Tabla de Pagos:**\n"
             "• 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** tu apuesta.\n"
             "• 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** tu apuesta.\n\n"
@@ -3371,6 +3408,9 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
 
     win_number = random.randint(1, 50)
     info = QUINIELA_NUMBERS.get(win_number, {"name": f"Número {win_number}", "emoji": "🎱"})
+
+    # Guardar en el historial de últimos resultados
+    record_quiniela_history(guild.id, win_number)
 
     bets = get_active_quiniela_bets(guild.id)
     quinielero_role = None
@@ -3454,13 +3494,22 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
 
     results_text.append(f"\n💰 **Total entregado en premios:** `{money(total_distributed)}`")
 
+    # Mostrar historial de últimos números
+    recent_history = get_quiniela_history(guild.id)
+    if len(recent_history) > 1:
+        hist_parts = []
+        for num in recent_history:
+            inf = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
+            hist_parts.append(f"**`{num:02d}`** {inf['emoji']}")
+        results_text.append(f"\n📜 **Últimos resultados:** " + " • ".join(hist_parts))
+
     result_img_path = ROOT / "assets" / "quiniela" / "resultados" / f"{win_number}.png"
     final_embed = discord.Embed(
         title=f"🎱 ¡SALIÓ EL {win_number:02d} — {info['name'].upper()} {info['emoji']}! 🏆",
         description="\n".join(results_text),
         color=discord.Color.green() if (exact_winners or near_winners) else discord.Color.gold(),
     )
-    final_embed.set_footer(text=f"Sorteo Oficial de la Quiniela • Hora Argentina {datetime.now(TZ).strftime('%H:%M')}")
+    final_embed.set_footer(text=f"Sorteo Oficial de la Quiniela • Hora Argentina {datetime.now(TZ).strftime('%H:%M')} • Se borra en 10m")
 
     result_file = discord.File(str(result_img_path), filename=f"{win_number}.png") if result_img_path.exists() else None
     if result_file:
@@ -3479,6 +3528,8 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
         else:
             res_msg = await channel.send(embed=final_embed)
         record_consumption_message(guild.id, channel.id, res_msg.id)
+        # El resultado permanece 10 minutos (600 seg) y se borra automáticamente para mantener limpio el kiosco:
+        asyncio.create_task(auto_delete_message(res_msg, 600))
     except Exception as e:
         print(f"Error publicando resultado final de la quiniela: {e}")
 
@@ -3504,12 +3555,16 @@ async def send_quiniela_announcement_20m(guild: discord.Guild):
         ),
         color=discord.Color.gold(),
     )
-    if banner_path.exists():
-        file = discord.File(str(banner_path), filename="banner.png")
-        embed.set_image(url="attachment://banner.png")
-        await channel.send(embed=embed, file=file)
-    else:
-        await channel.send(embed=embed)
+    try:
+        if banner_path.exists():
+            file = discord.File(str(banner_path), filename="banner.png")
+            embed.set_image(url="attachment://banner.png")
+            msg = await channel.send(embed=embed, file=file)
+        else:
+            msg = await channel.send(embed=embed)
+        asyncio.create_task(auto_delete_message(msg, 1200))
+    except Exception:
+        pass
 
 
 async def send_quiniela_announcement_5m(guild: discord.Guild):
@@ -3530,10 +3585,14 @@ async def send_quiniela_announcement_5m(guild: discord.Guild):
         ),
         color=discord.Color.gold(),
     )
-    if ping:
-        await channel.send(content=ping, embed=embed)
-    else:
-        await channel.send(embed=embed)
+    try:
+        if ping:
+            msg = await channel.send(content=ping, embed=embed)
+        else:
+            msg = await channel.send(embed=embed)
+        asyncio.create_task(auto_delete_message(msg, 300))
+    except Exception:
+        pass
 
 
 class ChanguitaSelect(discord.ui.Select):
