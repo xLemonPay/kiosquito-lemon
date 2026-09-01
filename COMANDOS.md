@@ -33,7 +33,7 @@
   - ⚠️ *¡Si te equivocás en un paso o juego, te rajan del laburo sin un mango y con 30 min de sanción!*
 
 ## 🎰 Lotería y Azar
-- `/raspadita` — Jugar a la Raspadita del Kiosquito en una grilla interactiva 3×3 (Límite: **15 cartones por día** por usuario). Costo: **$1.000** ($750 para Suscriptores y Boosters).
+- `/raspadita` — Jugar a la Raspadita del Kiosquito en una grilla interactiva 3×3 (Límite: **20 cartones por día** por usuario). Costo: **$1.000** ($750 para Suscriptores y Boosters).
   - 🍋 **`🍋 🍋 🍋` (0.5%):** ¡POZO ACUMULADO DEL SERVIDOR! (Arranca en $10.000 y acumula +$400 de cada tirada).
   - 💎 **`💎 💎 💎` (7.5%):** Ganás **$3.500** en efectivo.
   - 🍫 **`🍫 🍫 🍫` (12%):** Ganás **$1.500** + 1 Alfajor Jorgito a tu mochila.
@@ -63,6 +63,7 @@
 - `/admin_dar_dinero <usuario> <cantidad>` — Modifica el dinero de un usuario.
 - `/admin_dar_xp <usuario> <cantidad>` — Modifica la XP de un usuario.
 - `/admin_resetear <usuario>` — Resetea los datos e inventario de un usuario.
+- `/admin_resetear_raspaditas <usuario>` — Reinicia el límite diario de 20 raspaditas de un usuario para que pueda volver a jugar hoy.
 - `/autolimpieza <activado:True/False>` — Activa o desactiva el borrado automático de mensajes comunes en el canal del kiosco.
 - `/admin_sortear_quiniela` — Forzar o probar el sorteo de la Quiniela en vivo con animación de bolillero.
 - `/admin_quiniela_automatica <activado:True/False>` — Activa o desactiva los sorteos y avisos automáticos de las 22:00 hs.

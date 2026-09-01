@@ -1024,6 +1024,16 @@ def increment_user_raspadita_daily_count(conn: sqlite3.Connection, guild_id: int
     return row["count"] if row else 1
 
 
+def reset_user_raspadita_daily_count(guild_id: int, user_id: int) -> None:
+    today_str = datetime.now(TZ).strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM raspadita_daily WHERE guild_id=? AND user_id=? AND play_date=?",
+            (guild_id, user_id, today_str),
+        )
+
+
+RASPADITA_DAILY_LIMIT = 20
 QUINIELA_DRAWING: set[int] = set()
 
 
@@ -3144,9 +3154,9 @@ class RaspaditaConfirmView(discord.ui.View):
                 (self.guild_id, self.user_id, today_str),
             ).fetchone()
             daily_count = row["count"] if row else 0
-            if daily_count >= 15:
+            if daily_count >= RASPADITA_DAILY_LIMIT:
                 await interaction.response.edit_message(
-                    content="🛑 **Límite diario alcanzado:** Ya compraste tus **15 cartones** de Raspadita permitidos por hoy (15/15). ¡Volvé mañana a tentar a la suerte!",
+                    content=f"🛑 **Límite diario alcanzado:** Ya compraste tus **{RASPADITA_DAILY_LIMIT} cartones** de Raspadita permitidos por hoy ({RASPADITA_DAILY_LIMIT}/{RASPADITA_DAILY_LIMIT}). ¡Volvé mañana a tentar a la suerte!",
                     embed=None,
                     view=None,
                 )
@@ -3207,11 +3217,11 @@ async def start_raspadita_session(interaction: discord.Interaction):
         return
 
     daily_count = get_user_raspadita_daily_count(interaction.guild_id, interaction.user.id)
-    if daily_count >= 15:
+    if daily_count >= RASPADITA_DAILY_LIMIT:
         embed = discord.Embed(
-            title="🛑 Límite Diario de Raspaditas Alcanzado (15/15)",
+            title=f"🛑 Límite Diario de Raspaditas Alcanzado ({RASPADITA_DAILY_LIMIT}/{RASPADITA_DAILY_LIMIT})",
             description=(
-                "Ya compraste tus **15 cartones** de Raspadita permitidos para el día de hoy.\n\n"
+                f"Ya compraste tus **{RASPADITA_DAILY_LIMIT} cartones** de Raspadita permitidos para el día de hoy.\n\n"
                 "⏰ *El cupo se renueva a las 00:00 hs. ¡Mañana te esperamos para seguir tentando a la suerte!*"
             ),
             color=discord.Color.red(),
@@ -3248,7 +3258,8 @@ async def start_raspadita_session(interaction: discord.Interaction):
         description=(
             f"💰 **Pozo Acumulado actual:** `{money(jackpot)}` 🍋\n\n"
             f"💵 **Precio de tu cartón:** **{money(cost)}**{sub_badge}\n"
-            f"💼 **Tu saldo en billetera:** **{money(user['money'])}**\n\n"
+            f"💼 **Tu saldo en billetera:** **{money(user['money'])}**\n"
+            f"🎟️ **Tus cartones de hoy:** `{daily_count}/{RASPADITA_DAILY_LIMIT}`\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "🏆 **Tabla de Premios (3 casillas iguales):**\n"
             f"• `🍋 🍋 🍋` ➔ **¡EL POZO ACUMULADO!** ({money(jackpot)})\n"
@@ -5381,6 +5392,19 @@ async def admin_resetear(interaction: discord.Interaction, usuario: discord.Memb
 
     await interaction.response.send_message(
         f"♻️ Datos de {usuario.mention} reseteados.",
+        ephemeral=True,
+    )
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+
+@bot.tree.command(name="admin_resetear_raspaditas", description="[Admin] Reiniciar el límite diario de raspaditas de un usuario.")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(usuario="Usuario a reiniciar su límite diario de raspaditas")
+@app_commands.guild_only()
+async def admin_resetear_raspaditas(interaction: discord.Interaction, usuario: discord.Member):
+    reset_user_raspadita_daily_count(interaction.guild_id, usuario.id)
+    await interaction.response.send_message(
+        f"♻️ Se ha reiniciado el límite diario de raspaditas para {usuario.mention}. Ahora tiene **0/{RASPADITA_DAILY_LIMIT}** cartones jugados hoy.",
         ephemeral=True,
     )
     asyncio.create_task(auto_delete_interaction(interaction, 180))
