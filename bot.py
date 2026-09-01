@@ -5542,6 +5542,57 @@ async def admin_quiniela_automatica_cmd(interaction: discord.Interaction, activa
     )
 
 
+@bot.tree.command(name="admin_apuestas_quiniela", description="[Admin] Ver todas las apuestas registradas para el próximo sorteo de la Quiniela.")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.guild_only()
+async def admin_apuestas_quiniela_cmd(interaction: discord.Interaction):
+    bets = get_active_quiniela_bets(interaction.guild_id)
+    if not bets:
+        embed = discord.Embed(
+            title="🎱 Apuestas de la Quiniela — Registro Vacío",
+            description="Aún no hay ninguna apuesta registrada para el sorteo de hoy (22:00 hs).",
+            color=discord.Color.dark_grey(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
+        return
+
+    # Agrupar apuestas por usuario
+    user_bets_map = {}
+    total_recaudado = 0
+    for b in bets:
+        uid = b["user_id"]
+        if uid not in user_bets_map:
+            user_bets_map[uid] = []
+        user_bets_map[uid].append(b)
+        total_recaudado += b["bet_amount"]
+
+    lines = []
+    for uid, u_bets in user_bets_map.items():
+        uname = await resolve_member_name(interaction.guild, uid)
+        bets_str_list = []
+        for b in u_bets:
+            num = b["number"]
+            info = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
+            bets_str_list.append(f"**`{num:02d}` ({info['name']})** por `{money(b['bet_amount'])}`")
+        lines.append(f"👤 **@{uname}** ({len(u_bets)} jugada/s):\n  └ " + " | ".join(bets_str_list))
+
+    embed = discord.Embed(
+        title="🎱 Apuestas Registradas para la Quiniela de Hoy",
+        description=(
+            f"📊 **Total de participantes:** `{len(user_bets_map)}`\n"
+            f"🎟️ **Total de apuestas:** `{len(bets)}`\n"
+            f"💰 **Total recaudado:** `{money(total_recaudado)}`\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            + "\n\n".join(lines)
+        ),
+        color=discord.Color.gold(),
+    )
+    embed.set_footer(text="Sorteo programado para las 22:00 hs (Hora Argentina)")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+
 # ---------- AUTOCOMPLETES DINÁMICOS ----------
 
 async def product_autocomplete(interaction: discord.Interaction, current: str):

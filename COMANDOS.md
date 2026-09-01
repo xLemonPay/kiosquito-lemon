@@ -67,6 +67,7 @@
 - `/autolimpieza <activado:True/False>` — Activa o desactiva el borrado automático de mensajes comunes en el canal del kiosco.
 - `/admin_sortear_quiniela` — Forzar o probar el sorteo de la Quiniela en vivo con animación de bolillero.
 - `/admin_quiniela_automatica <activado:True/False>` — Activa o desactiva los sorteos y avisos automáticos de las 22:00 hs.
+- `/admin_apuestas_quiniela` — Muestra la lista completa de todos los participantes y números apostados para el próximo sorteo de la Quiniela.
 
 ## 💬 Experiencia Automática
 - Los usuarios reciben entre 3 y 7 XP al participar activamente en el chat (con un cooldown de 1 minuto).
