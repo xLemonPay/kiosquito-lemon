@@ -3385,7 +3385,6 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
         num_info = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
         premio_potencial = apuesta * 35
         premio_palo = apuesta * 2
-        total_bets_now = len(existing_bets) + 1
 
         embed = discord.Embed(
             title="🎫 ¡Apuesta Registrada en la Quiniela! 🍀",
