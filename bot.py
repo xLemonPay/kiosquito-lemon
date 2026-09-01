@@ -683,6 +683,18 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS raspadita_daily (
+                guild_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                play_date TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (guild_id, user_id, play_date)
+            )
+            """
+        )
+
 
 def get_setting(guild_id: int, key: str, default: str = "0") -> str:
     with get_connection() as conn:
@@ -983,6 +995,36 @@ def add_raspadita_jackpot(guild_id: int, amount: int = 400) -> int:
 def reset_raspadita_jackpot(guild_id: int) -> int:
     set_setting(guild_id, "raspadita_jackpot", "10000")
     return 10000
+
+
+def get_user_raspadita_daily_count(guild_id: int, user_id: int) -> int:
+    today_str = datetime.now(TZ).strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT count FROM raspadita_daily WHERE guild_id=? AND user_id=? AND play_date=?",
+            (guild_id, user_id, today_str),
+        ).fetchone()
+        return row["count"] if row else 0
+
+
+def increment_user_raspadita_daily_count(conn: sqlite3.Connection, guild_id: int, user_id: int) -> int:
+    today_str = datetime.now(TZ).strftime("%Y-%m-%d")
+    conn.execute(
+        """
+        INSERT INTO raspadita_daily (guild_id, user_id, play_date, count)
+        VALUES (?, ?, ?, 1)
+        ON CONFLICT(guild_id, user_id, play_date) DO UPDATE SET count=count+1
+        """,
+        (guild_id, user_id, today_str),
+    )
+    row = conn.execute(
+        "SELECT count FROM raspadita_daily WHERE guild_id=? AND user_id=? AND play_date=?",
+        (guild_id, user_id, today_str),
+    ).fetchone()
+    return row["count"] if row else 1
+
+
+QUINIELA_DRAWING: set[int] = set()
 
 
 def is_subscriber(member: discord.Member | discord.User) -> bool:
@@ -2831,18 +2873,19 @@ class RaspaditaGameView(discord.ui.View):
         self.parent_interaction = parent_interaction
         self.revealed_indices = []
         self.game_over = False
+        self.lock = asyncio.Lock()
 
-        # Probabilidades:
-        # 2% -> Pozo Acumulado (🍋)
-        # 8% -> Diamantes $3.500 (💎)
-        # 12% -> Golosinas $1.500 + Alfajor (🍫)
-        # 78% -> Sin premio
+        # Probabilidades balanceadas:
+        # 0.5% -> Pozo Acumulado (🍋)
+        # 7.5% -> Diamantes $3.500 (💎)
+        # 12.0% -> Golosinas $1.500 + Alfajor (🍫)
+        # 80.0% -> Sin premio
         roll = random.random()
-        if roll < 0.02:
+        if roll < 0.005:
             self.win_type = "🍋"
-        elif roll < 0.10:
+        elif roll < 0.080:
             self.win_type = "💎"
-        elif roll < 0.22:
+        elif roll < 0.200:
             self.win_type = "🍫"
         else:
             self.win_type = None
@@ -2911,154 +2954,155 @@ class RaspaditaGameView(discord.ui.View):
             if interaction.user.id != self.user_id:
                 await interaction.response.send_message("¡Este cartón no es tuyo! 😅", ephemeral=True)
                 return
-            if self.game_over or idx in self.revealed_indices:
-                return
 
-            self.revealed_indices.append(idx)
-            scratched = len(self.revealed_indices)
+            async with self.lock:
+                if self.game_over or idx in self.revealed_indices or len(self.revealed_indices) >= 3:
+                    return
 
-            if self.win_type is not None:
-                self.board[idx] = self.win_type
-            else:
-                self.board[idx] = self.player_loss_symbols[scratched - 1]
+                self.revealed_indices.append(idx)
+                scratched = len(self.revealed_indices)
 
-            if scratched < 3:
-                self.build_grid()
-                await interaction.response.edit_message(embed=self.build_embed(), view=self)
-                return
+                if self.win_type is not None:
+                    self.board[idx] = self.win_type
+                else:
+                    self.board[idx] = self.player_loss_symbols[scratched - 1]
 
-            self.game_over = True
-            unpicked = [i for i in range(9) if i not in self.revealed_indices]
-            random.shuffle(unpicked)
+                if scratched < 3:
+                    self.build_grid()
+                    await interaction.response.edit_message(embed=self.build_embed(), view=self)
+                    return
 
-            if self.win_type is not None:
-                other_pool = [x for x in ["🍋", "💎", "🍫", "💩", "🍂", "🧻", "🪙"] if x != self.win_type]
-                extras = []
-                for s in other_pool:
-                    extras.extend([s, s])
-                random.shuffle(extras)
-                for i, u_idx in enumerate(unpicked):
-                    self.board[u_idx] = extras[i]
-            else:
-                for u_idx in unpicked[:3]:
-                    self.board[u_idx] = self.missed_prize_symbol
-                filler = [x for x in ["💩", "🍂", "🧻", "🪙", "🍫", "💎"] if x != self.missed_prize_symbol]
-                random.shuffle(filler)
-                for i, u_idx in enumerate(unpicked[3:]):
-                    self.board[u_idx] = filler[i]
+                self.game_over = True
+                unpicked = [i for i in range(9) if i not in self.revealed_indices]
+                random.shuffle(unpicked)
 
-            c1 = self.board[self.revealed_indices[0]]
-            c2 = self.board[self.revealed_indices[1]]
-            c3 = self.board[self.revealed_indices[2]]
+                if self.win_type is not None:
+                    other_pool = [x for x in ["🍋", "💎", "🍫", "💩", "🍂", "🧻", "🪙"] if x != self.win_type]
+                    extras = []
+                    for s in other_pool:
+                        extras.extend([s, s])
+                    random.shuffle(extras)
+                    for i, u_idx in enumerate(unpicked):
+                        self.board[u_idx] = extras[i]
+                else:
+                    for u_idx in unpicked[:3]:
+                        self.board[u_idx] = self.missed_prize_symbol
+                    filler = [x for x in ["💩", "🍂", "🧻", "🪙", "🍫", "💎"] if x != self.missed_prize_symbol]
+                    random.shuffle(filler)
+                    for i, u_idx in enumerate(unpicked[3:]):
+                        self.board[u_idx] = filler[i]
 
-            jackpot = get_raspadita_jackpot(self.guild_id)
+                c1 = self.board[self.revealed_indices[0]]
+                c2 = self.board[self.revealed_indices[1]]
+                c3 = self.board[self.revealed_indices[2]]
 
-            if c1 == c2 == c3 == "🍋":
-                win_amount = jackpot
-                reset_raspadita_jackpot(self.guild_id)
-                with get_connection() as conn:
-                    ensure_user(conn, self.guild_id, self.user_id)
-                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
-                    user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+                jackpot = get_raspadita_jackpot(self.guild_id)
 
-                self.build_grid()
-                embed = discord.Embed(
-                    title="🎆 ¡¡¡GANASTE EL POZO ACUMULADO DE LA RASPADITA!!! 🍋🍋🍋",
-                    description=(
-                        f"¡¡SACASTE 3 LIMONES DE ORO!! ¡Sos el ganador del Jackpot!\n\n"
-                        f"💰 **Premio cobrado:** **+{money(win_amount)}**\n"
-                        f"💼 Billetera: **{money(user['money'])}**\n\n"
-                        "*(Se destapó todo el cartón para que veas el tablero completo)*"
-                    ),
-                    color=discord.Color.green(),
-                )
-                await interaction.response.edit_message(embed=embed, view=self)
+                if c1 == c2 == c3 == "🍋":
+                    win_amount = jackpot
+                    reset_raspadita_jackpot(self.guild_id)
+                    with get_connection() as conn:
+                        ensure_user(conn, self.guild_id, self.user_id)
+                        conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
+                        user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
 
-                if interaction.channel:
-                    try:
-                        msg = await interaction.channel.send(
-                            f"🎆 **¡¡¡FELICITACIONES {interaction.user.mention}!!!** 🍾🍋\n"
-                            f"> 🎰 ¡Acaba de raspar **3 LIMONES** `🍋 🍋 🍋` y se llevó el **POZO ACUMULADO DE {money(win_amount)}**! 💰🎉"
-                        )
-                        record_consumption_message(self.guild_id, interaction.channel_id, msg.id)
-                    except Exception as e:
-                        print(f"Aviso anuncio jackpot: {e}")
-                if interaction.guild:
-                    asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
-                return
+                    self.build_grid()
+                    embed = discord.Embed(
+                        title="🎆 ¡¡¡GANASTE EL POZO ACUMULADO DE LA RASPADITA!!! 🍋🍋🍋",
+                        description=(
+                            f"¡¡SACASTE 3 LIMONES DE ORO!! ¡Sos el ganador del Jackpot!\n\n"
+                            f"💰 **Premio cobrado:** **+{money(win_amount)}**\n"
+                            f"💼 Billetera: **{money(user['money'])}**\n\n"
+                            "*(Se destapó todo el cartón para que veas el tablero completo)*"
+                        ),
+                        color=discord.Color.green(),
+                    )
+                    await interaction.response.edit_message(embed=embed, view=self)
 
-            elif c1 == c2 == c3 == "💎":
-                win_amount = 3500
-                add_raspadita_jackpot(self.guild_id, 400)
-                with get_connection() as conn:
-                    ensure_user(conn, self.guild_id, self.user_id)
-                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
-                    user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+                    if interaction.channel:
+                        try:
+                            msg = await interaction.channel.send(
+                                f"🎆 **¡¡¡FELICITACIONES {interaction.user.mention}!!!** 🍾🍋\n"
+                                f"> 🎰 ¡Acaba de raspar **3 LIMONES** `🍋 🍋 🍋` y se llevó el **POZO ACUMULADO DE {money(win_amount)}**! 💰🎉"
+                            )
+                            record_consumption_message(self.guild_id, interaction.channel_id, msg.id)
+                        except Exception as e:
+                            print(f"Aviso anuncio jackpot: {e}")
+                    if interaction.guild:
+                        asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
+                    return
 
-                self.build_grid()
-                embed = discord.Embed(
-                    title="💎 ¡¡3 DIAMANTES! PREMIO MAYOR 💎",
-                    description=(
-                        f"¡Impresionante! Conseguiste 3 diamantes `💎 💎 💎`.\n\n"
-                        f"💵 **Premio:** **+{money(win_amount)}** en efectivo\n"
-                        f"💼 Billetera: **{money(user['money'])}**\n\n"
-                        "*(Se destapó todo el cartón para que veas el tablero completo)*"
-                    ),
-                    color=discord.Color.green(),
-                )
-                await interaction.response.edit_message(embed=embed, view=self)
-                if interaction.guild:
-                    asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
-                return
+                elif c1 == c2 == c3 == "💎":
+                    win_amount = 3500
+                    add_raspadita_jackpot(self.guild_id, 400)
+                    with get_connection() as conn:
+                        ensure_user(conn, self.guild_id, self.user_id)
+                        conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
+                        user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
 
-            elif c1 == c2 == c3 == "🍫":
-                win_amount = 1500
-                add_raspadita_jackpot(self.guild_id, 400)
-                with get_connection() as conn:
-                    ensure_user(conn, self.guild_id, self.user_id)
-                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
-                    user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+                    self.build_grid()
+                    embed = discord.Embed(
+                        title="💎 ¡¡3 DIAMANTES! PREMIO MAYOR 💎",
+                        description=(
+                            f"¡Impresionante! Conseguiste 3 diamantes `💎 💎 💎`.\n\n"
+                            f"💵 **Premio:** **+{money(win_amount)}** en efectivo\n"
+                            f"💼 Billetera: **{money(user['money'])}**\n\n"
+                            "*(Se destapó todo el cartón para que veas el tablero completo)*"
+                        ),
+                        color=discord.Color.green(),
+                    )
+                    await interaction.response.edit_message(embed=embed, view=self)
+                    if interaction.guild:
+                        asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
+                    return
 
-                add_inventory_item(self.guild_id, self.user_id, "jorgito", 1)
+                elif c1 == c2 == c3 == "🍫":
+                    win_amount = 1500
+                    add_raspadita_jackpot(self.guild_id, 400)
+                    with get_connection() as conn:
+                        ensure_user(conn, self.guild_id, self.user_id)
+                        conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (win_amount, self.guild_id, self.user_id))
+                        user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
 
-                self.build_grid()
-                embed = discord.Embed(
-                    title="🍫 ¡¡3 GOLOSINAS! PREMIO DULCE 🍫",
-                    description=(
-                        f"¡Qué rico! Conseguiste 3 chocolates `🍫 🍫 🍫`.\n\n"
-                        f"💵 **Premio:** **+{money(win_amount)}** en efectivo\n"
-                        f"🎒 **Bonus:** **+1 Alfajor Jorgito** agregado a tu mochila!\n"
-                        f"💼 Billetera: **{money(user['money'])}**\n\n"
-                        "*(Se destapó todo el cartón para que veas el tablero completo)*"
-                    ),
-                    color=discord.Color.green(),
-                )
-                await interaction.response.edit_message(embed=embed, view=self)
-                if interaction.guild:
-                    asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
-                return
+                    add_inventory_item(self.guild_id, self.user_id, "jorgito", 1)
 
-            else:
-                new_jackpot = add_raspadita_jackpot(self.guild_id, 400)
-                user = get_user(self.guild_id, self.user_id)
+                    self.build_grid()
+                    embed = discord.Embed(
+                        title="🍫 ¡¡3 GOLOSINAS! PREMIO DULCE 🍫",
+                        description=(
+                            f"¡Qué rico! Conseguiste 3 chocolates `🍫 🍫 🍫`.\n\n"
+                            f"💵 **Premio:** **+{money(win_amount)}** en efectivo\n"
+                            f"🎒 **Bonus:** **+1 Alfajor Jorgito** agregado a tu mochila!\n"
+                            f"💼 Billetera: **{money(user['money'])}**\n\n"
+                            "*(Se destapó todo el cartón para que veas el tablero completo)*"
+                        ),
+                        color=discord.Color.green(),
+                    )
+                    await interaction.response.edit_message(embed=embed, view=self)
+                    if interaction.guild:
+                        asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
+                    return
 
-                self.build_grid()
-                missed_emoji = self.missed_prize_symbol
-                embed = discord.Embed(
-                    title="❌ ¡Siga participando! No hubo suerte",
-                    description=(
-                        f"Sacaste: **[{c1}] [{c2}] [{c3}]**.\n\n"
-                        f"¡No te desanimes! Se sumaron **+$400** al Pozo Acumulado.\n"
-                        f"💰 **Nuevo Pozo Acumulado:** `{money(new_jackpot)}`\n"
-                        f"💼 Billetera: **{money(user['money'])}**\n\n"
-                        "*(Se destapó todo el cartón para que veas dónde estaban los demás premios)*"
-                    ),
-                    color=discord.Color.dark_grey(),
-                )
-                await interaction.response.edit_message(embed=embed, view=self)
-                if interaction.guild:
-                    asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
-                return
+                else:
+                    new_jackpot = add_raspadita_jackpot(self.guild_id, 400)
+                    user = get_user(self.guild_id, self.user_id)
+
+                    self.build_grid()
+                    embed = discord.Embed(
+                        title="❌ ¡Siga participando! No hubo suerte",
+                        description=(
+                            f"Sacaste: **[{c1}] [{c2}] [{c3}]**.\n\n"
+                            f"¡No te desanimes! Se sumaron **+$400** al Pozo Acumulado.\n"
+                            f"💰 **Nuevo Pozo Acumulado:** `{money(new_jackpot)}`\n"
+                            f"💼 Billetera: **{money(user['money'])}**\n\n"
+                            "*(Se destapó todo el cartón para que veas dónde estaban los demás premios)*"
+                        ),
+                        color=discord.Color.dark_grey(),
+                    )
+                    await interaction.response.edit_message(embed=embed, view=self)
+                    if interaction.guild:
+                        asyncio.create_task(update_kiosk_fixed_message(interaction.guild, repost=False))
+                    return
 
         return callback
 
@@ -3090,22 +3134,40 @@ class RaspaditaConfirmView(discord.ui.View):
             )
             return
 
-        user = get_user(self.guild_id, self.user_id)
-        if user["money"] < self.cost:
-            await interaction.response.edit_message(
-                content=f"💸 No te alcanza la plata. Necesitás **{money(self.cost)}** y tenés **{money(user['money'])}**.",
-                embed=None,
-                view=None,
-            )
-            return
-
-        # Descontar dinero del usuario
+        today_str = datetime.now(TZ).strftime("%Y-%m-%d")
         with get_connection() as conn:
             ensure_user(conn, self.guild_id, self.user_id)
-            conn.execute(
-                "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
-                (self.cost, self.guild_id, self.user_id),
+
+            # Verificar límite diario atómicamente
+            row = conn.execute(
+                "SELECT count FROM raspadita_daily WHERE guild_id=? AND user_id=? AND play_date=?",
+                (self.guild_id, self.user_id, today_str),
+            ).fetchone()
+            daily_count = row["count"] if row else 0
+            if daily_count >= 15:
+                await interaction.response.edit_message(
+                    content="🛑 **Límite diario alcanzado:** Ya compraste tus **15 cartones** de Raspadita permitidos por hoy (15/15). ¡Volvé mañana a tentar a la suerte!",
+                    embed=None,
+                    view=None,
+                )
+                return
+
+            # Deducción atómica con verificación en SQL para evitar saldo negativo
+            cursor = conn.execute(
+                "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
+                (self.cost, self.guild_id, self.user_id, self.cost),
             )
+            if cursor.rowcount == 0:
+                user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, self.user_id)).fetchone()
+                user_money = user["money"] if user else 0
+                await interaction.response.edit_message(
+                    content=f"💸 No te alcanza la plata. Necesitás **{money(self.cost)}** y tenés **{money(user_money)}**.",
+                    embed=None,
+                    view=None,
+                )
+                return
+
+            increment_user_raspadita_daily_count(conn, self.guild_id, self.user_id)
 
         view = RaspaditaGameView(
             user_id=self.user_id,
@@ -3141,6 +3203,20 @@ async def start_raspadita_session(interaction: discord.Interaction):
             f"🔒 La lotería del kiosco está cerrada. Volvemos a abrir a las **{next_opening()}**.",
             ephemeral=True,
         )
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
+        return
+
+    daily_count = get_user_raspadita_daily_count(interaction.guild_id, interaction.user.id)
+    if daily_count >= 15:
+        embed = discord.Embed(
+            title="🛑 Límite Diario de Raspaditas Alcanzado (15/15)",
+            description=(
+                "Ya compraste tus **15 cartones** de Raspadita permitidos para el día de hoy.\n\n"
+                "⏰ *El cupo se renueva a las 00:00 hs. ¡Mañana te esperamos para seguir tentando a la suerte!*"
+            ),
+            color=discord.Color.red(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         asyncio.create_task(auto_delete_interaction(interaction, 180))
         return
 
@@ -3216,6 +3292,13 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        if self.guild_id in QUINIELA_DRAWING:
+            await interaction.response.send_message(
+                "⏳ **El sorteo de la Quiniela está en vivo en este momento.** Las apuestas volverán a abrir en unos instantes.",
+                ephemeral=True,
+            )
+            return
+
         try:
             num = int(self.numero_input.value.strip())
         except ValueError:
@@ -3236,31 +3319,42 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
             await interaction.response.send_message("❌ La apuesta mínima es de **$100** y la máxima de **$1.000**.", ephemeral=True)
             return
 
-        existing_bets = get_user_quiniela_bets(self.guild_id, interaction.user.id)
-        if len(existing_bets) >= 3:
-            await interaction.response.send_message(
-                "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 22:00 hs para ver los resultados!",
-                ephemeral=True,
-            )
-            return
-
-        user = get_user(self.guild_id, interaction.user.id)
-        if user["money"] < apuesta:
-            await interaction.response.send_message(
-                f"💸 No te alcanza la plata. Tu saldo actual es de **{money(user['money'])}** y querés apostar **{money(apuesta)}**.",
-                ephemeral=True,
-            )
-            return
-
-        # Descontar plata y registrar apuesta
+        # Descontar plata y registrar apuesta de forma atómica
         with get_connection() as conn:
             ensure_user(conn, self.guild_id, interaction.user.id)
-            conn.execute(
-                "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
-                (apuesta, self.guild_id, interaction.user.id),
-            )
 
-        record_quiniela_bet(self.guild_id, interaction.user.id, num, apuesta)
+            row = conn.execute(
+                "SELECT COUNT(*) as c FROM quiniela_bets WHERE guild_id=? AND user_id=?",
+                (self.guild_id, interaction.user.id),
+            ).fetchone()
+            current_bets_count = row["c"] if row else 0
+
+            if current_bets_count >= 3:
+                await interaction.response.send_message(
+                    "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 22:00 hs para ver los resultados!",
+                    ephemeral=True,
+                )
+                return
+
+            cursor = conn.execute(
+                "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
+                (apuesta, self.guild_id, interaction.user.id, apuesta),
+            )
+            if cursor.rowcount == 0:
+                user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (self.guild_id, interaction.user.id)).fetchone()
+                user_money = user["money"] if user else 0
+                await interaction.response.send_message(
+                    f"💸 No te alcanza la plata. Tu saldo actual es de **{money(user_money)}** y querés apostar **{money(apuesta)}**.",
+                    ephemeral=True,
+                )
+                return
+
+            now_ts = int(time.time())
+            conn.execute(
+                "INSERT INTO quiniela_bets (guild_id, user_id, number, bet_amount, created_at) VALUES (?, ?, ?, ?, ?)",
+                (self.guild_id, interaction.user.id, num, apuesta, now_ts),
+            )
+            total_bets_now = current_bets_count + 1
 
         # Borrar el mensaje de selección previo para que no se dupliquen
         if self.parent_interaction:
@@ -3342,6 +3436,13 @@ class QuinielaView(discord.ui.View):
 
 
 async def start_quiniela_session(interaction: discord.Interaction):
+    if interaction.guild_id in QUINIELA_DRAWING:
+        await interaction.response.send_message(
+            "⏳ **El sorteo de la Quiniela está en vivo en este momento.** Las apuestas volverán a abrir en unos instantes.",
+            ephemeral=True,
+        )
+        return
+
     user = get_user(interaction.guild_id, interaction.user.id)
     if user["money"] < 100:
         embed = discord.Embed(
@@ -3426,150 +3527,154 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
     if not channel:
         return
 
-    win_number = random.randint(1, 50)
-    info = QUINIELA_NUMBERS.get(win_number, {"name": f"Número {win_number}", "emoji": "🎱"})
-
-    # Guardar en el historial de últimos resultados
-    record_quiniela_history(guild.id, win_number)
-
-    bets = get_active_quiniela_bets(guild.id)
-    quinielero_role = None
-    for r in guild.roles:
-        if "quinielero" in r.name.lower():
-            quinielero_role = r
-            break
-
-    sorteando_path = ROOT / "assets" / "quiniela" / "sorteando.gif"
-    role_ping = quinielero_role.mention if (quinielero_role and not is_private) else ""
-
-    initial_embed = discord.Embed(
-        title="🎱 ¡SORTEO OFICIAL DE LA QUINIELA DEL KIOSQUITO! 🎰",
-        description=(
-            f"{role_ping}\n\n" if role_ping else ""
-            "🧔 **El Kiosquero:** *«¡Atención a todos los vecinos! Hacemos girar el bolillero de metal...»*\n\n"
-            "⏳ *Las bolillas están dando vueltas en el aire a toda velocidad...*"
-        ),
-        color=discord.Color.gold(),
-    )
-
-    gif_file = discord.File(str(sorteando_path), filename="sorteando.gif") if sorteando_path.exists() else None
-    if gif_file:
-        initial_embed.set_image(url="attachment://sorteando.gif")
-
-    content_msg = quinielero_role.mention if (quinielero_role and not is_private) else None
-    draw_msg = None
+    QUINIELA_DRAWING.add(guild.id)
     try:
+        win_number = random.randint(1, 50)
+        info = QUINIELA_NUMBERS.get(win_number, {"name": f"Número {win_number}", "emoji": "🎱"})
+
+        # Guardar en el historial de últimos resultados
+        record_quiniela_history(guild.id, win_number)
+
+        bets = get_active_quiniela_bets(guild.id)
+        quinielero_role = None
+        for r in guild.roles:
+            if "quinielero" in r.name.lower():
+                quinielero_role = r
+                break
+
+        sorteando_path = ROOT / "assets" / "quiniela" / "sorteando.gif"
+        role_ping = quinielero_role.mention if (quinielero_role and not is_private) else ""
+
+        initial_embed = discord.Embed(
+            title="🎱 ¡SORTEO OFICIAL DE LA QUINIELA DEL KIOSQUITO! 🎰",
+            description=(
+                f"{role_ping}\n\n" if role_ping else ""
+                "🧔 **El Kiosquero:** *«¡Atención a todos los vecinos! Hacemos girar el bolillero de metal...»*\n\n"
+                "⏳ *Las bolillas están dando vueltas en el aire a toda velocidad...*"
+            ),
+            color=discord.Color.gold(),
+        )
+
+        gif_file = discord.File(str(sorteando_path), filename="sorteando.gif") if sorteando_path.exists() else None
         if gif_file:
-            draw_msg = await channel.send(content=content_msg, embed=initial_embed, file=gif_file)
-        else:
-            draw_msg = await channel.send(content=content_msg, embed=initial_embed)
-    except Exception as e:
-        print(f"Error enviando mensaje inicial de la quiniela: {e}")
+            initial_embed.set_image(url="attachment://sorteando.gif")
 
-    # Pausa de 8 segundos para que se aprecie la animación del GIF del bolillero
-    await asyncio.sleep(8.0)
-
-    # Calcular ganadores
-    exact_winners = []
-    near_winners = []
-    total_distributed = 0
-    participant_user_ids = set()
-
-    for b in bets:
-        uid = b["user_id"]
-        bet_num = b["number"]
-        amount = b["bet_amount"]
-        participant_user_ids.add(uid)
-
-        if bet_num == win_number:
-            prize = amount * 35
-            exact_winners.append({"user_id": uid, "prize": prize, "bet": amount})
-            total_distributed += prize
-            with get_connection() as conn:
-                ensure_user(conn, guild.id, uid)
-                conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (prize, guild.id, uid))
-        elif abs(bet_num - win_number) == 1 or (bet_num == 1 and win_number == 50) or (bet_num == 50 and win_number == 1):
-            prize = amount * 2
-            near_winners.append({"user_id": uid, "prize": prize, "bet": amount, "number": bet_num})
-            total_distributed += prize
-            with get_connection() as conn:
-                ensure_user(conn, guild.id, uid)
-                conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (prize, guild.id, uid))
-
-    results_text = []
-    if exact_winners:
-        results_text.append("🏆 **¡ACIERTOS A LA CABEZA (x35)!** 🎯")
-        for w in exact_winners:
-            uname = await resolve_member_name(guild, w['user_id'])
-            results_text.append(f"• 🥇 **@{uname}** jugó `{money(w['bet'])}` al **{win_number}** ➔ **¡COBRÓ {money(w['prize'])}!** 💸🍾")
-        results_text.append("")
-
-    if near_winners:
-        results_text.append("🤏 **¡PEGÓ EN EL PALO (x2)!**")
-        for w in near_winners:
-            uname = await resolve_member_name(guild, w['user_id'])
-            results_text.append(f"• 🥈 **@{uname}** jugó `{money(w['bet'])}` al **{w['number']}** ➔ Cobró `{money(w['prize'])}` 🪙")
-        results_text.append("")
-
-    if not exact_winners and not near_winners:
-        results_text.append("❌ *¡La banca se quedó con todo! Ningún vecino acertó a este número hoy.*")
-
-    results_text.append(f"\n💰 **Total entregado en premios:** `{money(total_distributed)}`")
-
-    # Lista de todos los usuarios únicos que participaron hoy (mostrando su @tag sin arrobar con sonido)
-    if participant_user_ids:
-        p_names = []
-        for p_uid in set(participant_user_ids):
-            uname = await resolve_member_name(guild, p_uid)
-            p_names.append(f"**@{uname}**")
-        results_text.append(f"👥 **Participantes de hoy ({len(p_names)}):** " + ", ".join(p_names))
-
-    # Mostrar historial de últimos números
-    recent_history = get_quiniela_history(guild.id)
-    if len(recent_history) > 1:
-        hist_parts = []
-        for num in recent_history:
-            inf = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
-            hist_parts.append(f"**`{num:02d}`** {inf['emoji']}")
-        results_text.append(f"📜 **Últimos resultados:** " + " • ".join(hist_parts))
-
-    result_img_path = ROOT / "assets" / "quiniela" / "resultados" / f"{win_number}.png"
-    final_embed = discord.Embed(
-        title=f"🎱 ¡SALIÓ EL {win_number:02d} — {info['name'].upper()} {info['emoji']}! 🏆",
-        description="\n".join(results_text),
-        color=discord.Color.green() if (exact_winners or near_winners) else discord.Color.gold(),
-    )
-    final_embed.set_footer(text=f"Sorteo Oficial de la Quiniela • Hora Argentina {datetime.now(TZ).strftime('%H:%M')} • Se borra en 10m")
-
-    result_file = discord.File(str(result_img_path), filename=f"{win_number}.png") if result_img_path.exists() else None
-    if result_file:
-        final_embed.set_image(url=f"attachment://{win_number}.png")
-
-    # Limpiar el mensaje de animación previo para dejar el canal impecable
-    if draw_msg:
+        content_msg = quinielero_role.mention if (quinielero_role and not is_private) else None
+        draw_msg = None
         try:
-            await draw_msg.delete()
-        except Exception:
-            pass
+            if gif_file:
+                draw_msg = await channel.send(content=content_msg, embed=initial_embed, file=gif_file)
+            else:
+                draw_msg = await channel.send(content=content_msg, embed=initial_embed)
+        except Exception as e:
+            print(f"Error enviando mensaje inicial de la quiniela: {e}")
 
-    try:
-        no_mentions = discord.AllowedMentions.none()
+        # Pausa de 8 segundos para que se aprecie la animación del GIF del bolillero
+        await asyncio.sleep(8.0)
+
+        # Calcular ganadores
+        exact_winners = []
+        near_winners = []
+        total_distributed = 0
+        participant_user_ids = set()
+
+        for b in bets:
+            uid = b["user_id"]
+            bet_num = b["number"]
+            amount = b["bet_amount"]
+            participant_user_ids.add(uid)
+
+            if bet_num == win_number:
+                prize = amount * 35
+                exact_winners.append({"user_id": uid, "prize": prize, "bet": amount})
+                total_distributed += prize
+                with get_connection() as conn:
+                    ensure_user(conn, guild.id, uid)
+                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (prize, guild.id, uid))
+            elif abs(bet_num - win_number) == 1 or (bet_num == 1 and win_number == 50) or (bet_num == 50 and win_number == 1):
+                prize = amount * 2
+                near_winners.append({"user_id": uid, "prize": prize, "bet": amount, "number": bet_num})
+                total_distributed += prize
+                with get_connection() as conn:
+                    ensure_user(conn, guild.id, uid)
+                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (prize, guild.id, uid))
+
+        results_text = []
+        if exact_winners:
+            results_text.append("🏆 **¡ACIERTOS A LA CABEZA (x35)!** 🎯")
+            for w in exact_winners:
+                uname = await resolve_member_name(guild, w['user_id'])
+                results_text.append(f"• 🥇 **@{uname}** jugó `{money(w['bet'])}` al **{win_number}** ➔ **¡COBRÓ {money(w['prize'])}!** 💸🍾")
+            results_text.append("")
+
+        if near_winners:
+            results_text.append("🤏 **¡PEGÓ EN EL PALO (x2)!**")
+            for w in near_winners:
+                uname = await resolve_member_name(guild, w['user_id'])
+                results_text.append(f"• 🥈 **@{uname}** jugó `{money(w['bet'])}` al **{w['number']}** ➔ Cobró `{money(w['prize'])}` 🪙")
+            results_text.append("")
+
+        if not exact_winners and not near_winners:
+            results_text.append("❌ *¡La banca se quedó con todo! Ningún vecino acertó a este número hoy.*")
+
+        results_text.append(f"\n💰 **Total entregado en premios:** `{money(total_distributed)}`")
+
+        # Lista de todos los usuarios únicos que participaron hoy (mostrando su @tag sin arrobar con sonido)
+        if participant_user_ids:
+            p_names = []
+            for p_uid in set(participant_user_ids):
+                uname = await resolve_member_name(guild, p_uid)
+                p_names.append(f"**@{uname}**")
+            results_text.append(f"👥 **Participantes de hoy ({len(p_names)}):** " + ", ".join(p_names))
+
+        # Mostrar historial de últimos números
+        recent_history = get_quiniela_history(guild.id)
+        if len(recent_history) > 1:
+            hist_parts = []
+            for num in recent_history:
+                inf = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
+                hist_parts.append(f"**`{num:02d}`** {inf['emoji']}")
+            results_text.append(f"📜 **Últimos resultados:** " + " • ".join(hist_parts))
+
+        result_img_path = ROOT / "assets" / "quiniela" / "resultados" / f"{win_number}.png"
+        final_embed = discord.Embed(
+            title=f"🎱 ¡SALIÓ EL {win_number:02d} — {info['name'].upper()} {info['emoji']}! 🏆",
+            description="\n".join(results_text),
+            color=discord.Color.green() if (exact_winners or near_winners) else discord.Color.gold(),
+        )
+        final_embed.set_footer(text=f"Sorteo Oficial de la Quiniela • Hora Argentina {datetime.now(TZ).strftime('%H:%M')} • Se borra en 10m")
+
+        result_file = discord.File(str(result_img_path), filename=f"{win_number}.png") if result_img_path.exists() else None
         if result_file:
-            res_msg = await channel.send(embed=final_embed, file=result_file, allowed_mentions=no_mentions)
-        else:
-            res_msg = await channel.send(embed=final_embed, allowed_mentions=no_mentions)
-        record_consumption_message(guild.id, channel.id, res_msg.id)
-        # El resultado permanece 10 minutos (600 seg) y se borra automáticamente para mantener limpio el kiosco:
-        asyncio.create_task(auto_delete_message(res_msg, 600))
-    except Exception as e:
-        print(f"Error publicando resultado final de la quiniela: {e}")
+            final_embed.set_image(url=f"attachment://{win_number}.png")
 
-    # Limpiar apuestas del sorteo
-    clear_quiniela_bets(guild.id)
+        # Limpiar el mensaje de animación previo para dejar el canal impecable
+        if draw_msg:
+            try:
+                await draw_msg.delete()
+            except Exception:
+                pass
 
-    # Quitar rol Quinielero a los 20 minutos
-    if participant_user_ids and quinielero_role:
-        asyncio.create_task(schedule_quinielero_role_removal(guild, quinielero_role, list(participant_user_ids), 1200))
+        try:
+            no_mentions = discord.AllowedMentions.none()
+            if result_file:
+                res_msg = await channel.send(embed=final_embed, file=result_file, allowed_mentions=no_mentions)
+            else:
+                res_msg = await channel.send(embed=final_embed, allowed_mentions=no_mentions)
+            record_consumption_message(guild.id, channel.id, res_msg.id)
+            # El resultado permanece 10 minutos (600 seg) y se borra automáticamente para mantener limpio el kiosco:
+            asyncio.create_task(auto_delete_message(res_msg, 600))
+        except Exception as e:
+            print(f"Error publicando resultado final de la quiniela: {e}")
+
+        # Limpiar apuestas del sorteo
+        clear_quiniela_bets(guild.id)
+
+        # Quitar rol Quinielero a los 20 minutos
+        if participant_user_ids and quinielero_role:
+            asyncio.create_task(schedule_quinielero_role_removal(guild, quinielero_role, list(participant_user_ids), 1200))
+    finally:
+        QUINIELA_DRAWING.discard(guild.id)
 
 
 async def send_quiniela_announcement_20m(guild: discord.Guild):
@@ -5311,34 +5416,52 @@ async def quiniela_cmd(
     numero: app_commands.Range[int, 1, 50] | None = None,
     apuesta: app_commands.Range[int, 100, 1000] | None = None,
 ):
+    if interaction.guild_id in QUINIELA_DRAWING:
+        await interaction.response.send_message(
+            "⏳ **El sorteo de la Quiniela está en vivo en este momento.** Las apuestas volverán a abrir en unos instantes.",
+            ephemeral=True,
+        )
+        return
+
     if numero is None or apuesta is None:
         await start_quiniela_session(interaction)
         return
 
-    existing_bets = get_user_quiniela_bets(interaction.guild_id, interaction.user.id)
-    if len(existing_bets) >= 3:
-        await interaction.response.send_message(
-            "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 22:00 hs para ver los resultados!",
-            ephemeral=True,
-        )
-        return
-
-    user = get_user(interaction.guild_id, interaction.user.id)
-    if user["money"] < apuesta:
-        await interaction.response.send_message(
-            f"💸 No te alcanza la plata. Tenés **{money(user['money'])}** y querés apostar **{money(apuesta)}**.",
-            ephemeral=True,
-        )
-        return
-
     with get_connection() as conn:
         ensure_user(conn, interaction.guild_id, interaction.user.id)
-        conn.execute(
-            "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
-            (apuesta, interaction.guild_id, interaction.user.id),
-        )
 
-    record_quiniela_bet(interaction.guild_id, interaction.user.id, numero, apuesta)
+        row = conn.execute(
+            "SELECT COUNT(*) as c FROM quiniela_bets WHERE guild_id=? AND user_id=?",
+            (interaction.guild_id, interaction.user.id),
+        ).fetchone()
+        current_bets_count = row["c"] if row else 0
+
+        if current_bets_count >= 3:
+            await interaction.response.send_message(
+                "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 22:00 hs para ver los resultados!",
+                ephemeral=True,
+            )
+            return
+
+        cursor = conn.execute(
+            "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
+            (apuesta, interaction.guild_id, interaction.user.id, apuesta),
+        )
+        if cursor.rowcount == 0:
+            user = conn.execute("SELECT money FROM users WHERE guild_id=? AND user_id=?", (interaction.guild_id, interaction.user.id)).fetchone()
+            user_money = user["money"] if user else 0
+            await interaction.response.send_message(
+                f"💸 No te alcanza la plata. Tenés **{money(user_money)}** y querés apostar **{money(apuesta)}**.",
+                ephemeral=True,
+            )
+            return
+
+        now_ts = int(time.time())
+        conn.execute(
+            "INSERT INTO quiniela_bets (guild_id, user_id, number, bet_amount, created_at) VALUES (?, ?, ?, ?, ?)",
+            (interaction.guild_id, interaction.user.id, numero, apuesta, now_ts),
+        )
+        total_bets_now = current_bets_count + 1
 
     quinielero_role = await get_or_create_quinielero_role(interaction.guild)
     if quinielero_role and isinstance(interaction.user, discord.Member):

@@ -33,11 +33,11 @@
   - ⚠️ *¡Si te equivocás en un paso o juego, te rajan del laburo sin un mango y con 30 min de sanción!*
 
 ## 🎰 Lotería y Azar
-- `/raspadita` — Jugar a la Raspadita del Kiosquito en una grilla interactiva 3×3. Costo: **$1.000** ($750 para Suscriptores y Boosters).
-  - 🍋 **`🍋 🍋 🍋` (2%):** ¡POZO ACUMULADO DEL SERVIDOR! (Arranca en $10.000 y acumula +$400 de cada tirada).
-  - 💎 **`💎 💎 💎` (8%):** Ganás **$3.500** en efectivo.
+- `/raspadita` — Jugar a la Raspadita del Kiosquito en una grilla interactiva 3×3 (Límite: **15 cartones por día** por usuario). Costo: **$1.000** ($750 para Suscriptores y Boosters).
+  - 🍋 **`🍋 🍋 🍋` (0.5%):** ¡POZO ACUMULADO DEL SERVIDOR! (Arranca en $10.000 y acumula +$400 de cada tirada).
+  - 💎 **`💎 💎 💎` (7.5%):** Ganás **$3.500** en efectivo.
   - 🍫 **`🍫 🍫 🍫` (12%):** Ganás **$1.500** + 1 Alfajor Jorgito a tu mochila.
-  - ❌ **Sin Premio (78%):** Se suman **+$400** al Pozo Acumulado.
+  - ❌ **Sin Premio (80%):** Se suman **+$400** al Pozo Acumulado.
 - `/quiniela [numero] [apuesta]` — Apostar a un número de la suerte (del 1 al 50) para el sorteo diario de las 22:00 hs (Máximo 3 apuestas por usuario por sorteo).
   - 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** la apuesta.
   - 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** la apuesta.
