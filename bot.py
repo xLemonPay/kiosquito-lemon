@@ -6268,20 +6268,26 @@ class PenaltyGameView(discord.ui.View):
 
 
 class PenaltyInviteView(discord.ui.View):
-    def __init__(self, challenger: discord.Member, challenged: discord.Member, bet: int):
+    def __init__(self, challenger: discord.Member, challenged: discord.Member, bet: int, message: discord.Message | None = None):
         super().__init__(timeout=60)
         self.challenger = challenger
         self.challenged = challenged
         self.bet = bet
+        self.message = message
 
     async def on_timeout(self):
         ACTIVE_PENALTY_DUELS.discard(self.challenger.id)
         ACTIVE_PENALTY_DUELS.discard(self.challenged.id)
+        if self.message:
+            try:
+                await self.message.edit(content=f"⏱️ El desafío de penales hacia {self.challenged.mention} expiró por falta de respuesta.", embed=None, view=None)
+            except Exception:
+                pass
 
     @discord.ui.button(label="Aceptar Duelo", emoji="🧤", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.challenged.id:
-            await interaction.response.send_message(f"⏳ Este desafío es para {self.challenged.mention}. Solo él puede aceptar.", ephemeral=True)
+            await interaction.response.send_message(f"⏳ Este desafío es para {self.challenged.mention}. Solo él puede aceptar el reto.", ephemeral=True)
             return
 
         with get_connection() as conn:
@@ -6367,6 +6373,12 @@ async def admin_test_penales_cmd(
     ACTIVE_PENALTY_DUELS.add(interaction.user.id)
     ACTIVE_PENALTY_DUELS.add(usuario.id)
 
+    # Respuesta privada al retador
+    await interaction.response.send_message(
+        f"📨 Desafío de penales enviado a {usuario.mention} por **{money(apuesta)}**. Esperando su respuesta...",
+        ephemeral=True,
+    )
+
     embed = discord.Embed(
         title="🏟️ ¡DESAFÍO DE PENALES EN EL POTRERO! ⚽🔥",
         description=(
@@ -6374,13 +6386,13 @@ async def admin_test_penales_cmd(
             f"💵 **Apuesta:** **{money(apuesta)}** cada uno\n"
             f"💰 **Pozo Total:** **{money(apuesta * 2)}**\n"
             "📋 **Reglas:** 3 penales por lado. En caso de empate, ¡muerte súbita (gol gana de diferencia)!\n\n"
-            f"👉 **{usuario.mention}**, ¿aceptás el reto?\n"
-            "*(Solo el jugador invitado puede aceptar)*"
+            f"👉 **{usuario.mention}**, ¿aceptás el reto?"
         ),
         color=discord.Color.gold(),
     )
     view = PenaltyInviteView(challenger=interaction.user, challenged=usuario, bet=apuesta)
-    await interaction.response.send_message(content=usuario.mention, embed=embed, view=view)
+    msg = await interaction.channel.send(content=usuario.mention, embed=embed, view=view)
+    view.message = msg
 
 
 # ---------- AUTOCOMPLETES DINÁMICOS ----------
