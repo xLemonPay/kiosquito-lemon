@@ -6224,6 +6224,7 @@ class PenaltyGameView(discord.ui.View):
 
         if uid not in (shooter.id, keeper.id):
             await interaction.response.send_message("❌ No sos parte de este duelo de penales.", ephemeral=True)
+            asyncio.create_task(auto_delete_interaction(interaction, 2))
             return
 
         dir_names = {"izq": "⬅️ Izquierda", "centro": "⬆️ Centro", "der": "➡️ Derecha"}
@@ -6232,6 +6233,7 @@ class PenaltyGameView(discord.ui.View):
         if uid == shooter.id:
             if self.match.shooter_choice is not None:
                 await interaction.response.send_message("⏳ Ya elegiste hacia dónde patear. Esperando al arquero...", ephemeral=True)
+                asyncio.create_task(auto_delete_interaction(interaction, 2))
                 return
             self.match.shooter_choice = direction
             await interaction.response.send_message(
@@ -6239,10 +6241,12 @@ class PenaltyGameView(discord.ui.View):
                 f"⏳ Esperando que el arquero **@{keeper.display_name}** decida hacia dónde tirarse...",
                 ephemeral=True,
             )
+            asyncio.create_task(auto_delete_interaction(interaction, 2))
 
         elif uid == keeper.id:
             if self.match.keeper_choice is not None:
                 await interaction.response.send_message("⏳ Ya elegiste hacia dónde tirarte. Esperando al pateador...", ephemeral=True)
+                asyncio.create_task(auto_delete_interaction(interaction, 2))
                 return
             self.match.keeper_choice = direction
             await interaction.response.send_message(
@@ -6250,6 +6254,7 @@ class PenaltyGameView(discord.ui.View):
                 f"⏳ Esperando que el pateador **@{shooter.display_name}** ejecute el tiro...",
                 ephemeral=True,
             )
+            asyncio.create_task(auto_delete_interaction(interaction, 2))
 
         if self.match.shooter_choice is not None and self.match.keeper_choice is not None:
             await self.match.resolve_turn(interaction)
