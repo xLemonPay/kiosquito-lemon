@@ -34,7 +34,7 @@
 
 ## 🎰 Lotería y Azar
 - `/raspadita` — Jugar a la Raspadita del Kiosquito en una grilla interactiva 3×3 (Límite: **20 cartones por día** por usuario). Costo: **$1.000** ($750 para Suscriptores y Boosters).
-  - 🍋 **`🍋 🍋 🍋` (0.15%):** ¡POZO ACUMULADO DEL SERVIDOR! (Arranca en $10.000 y acumula +$400 de cada tirada).
+  - 🍋 **`🍋 🍋 🍋` (0.05%):** ¡POZO ACUMULADO DEL SERVIDOR! (Arranca en $10.000 y acumula +$400 de cada tirada).
   - 💎 **`💎 💎 💎` (7.85%):** Ganás **$3.500** en efectivo.
   - 🍫 **`🍫 🍫 🍫` (12%):** Ganás **$1.500** + 1 Alfajor Jorgito a tu mochila.
   - ❌ **Sin Premio (80%):** Se suman **+$400** al Pozo Acumulado.

@@ -2947,12 +2947,12 @@ class RaspaditaGameView(discord.ui.View):
         self.lock = asyncio.Lock()
 
         # Probabilidades balanceadas:
-        # 0.15% -> Pozo Acumulado (🍋) (1 en 666)
-        # 7.85% -> Diamantes $3.500 (💎)
+        # 0.05% -> Pozo Acumulado (🍋) (1 en 2000)
+        # 7.95% -> Diamantes $3.500 (💎)
         # 12.0% -> Golosinas $1.500 + Alfajor (🍫)
         # 80.0% -> Sin premio (+$400 al pozo)
         roll = random.random()
-        if roll < 0.0015:
+        if roll < 0.0005:
             self.win_type = "🍋"
         elif roll < 0.0800:
             self.win_type = "💎"
