@@ -5992,6 +5992,18 @@ async def admin_apuestas_quiniela_cmd(interaction: discord.Interaction):
 
 ACTIVE_PENALTY_DUELS: set[int] = set()
 
+PENALTY_IMAGES = {
+    ("der", "der"): "01_Atajada_Derecha.png",
+    ("izq", "izq"): "02_Atajada_Izquierda.png",
+    ("centro", "centro"): "03_Atajada_Centro.png",
+    ("izq", "der"): "04_Gol_Izquierda_Arquero_Derecha.png",
+    ("centro", "der"): "05_Gol_Centro_Arquero_Derecha.png",
+    ("centro", "izq"): "06_Gol_Centro_Arquero_Izquierda.png",
+    ("der", "izq"): "07_Gol_Derecha_Arquero_Izquierda.png",
+    ("der", "centro"): "08_Gol_Derecha_Arquero_Centro.png",
+    ("izq", "centro"): "09_Gol_Izquierda_Arquero_Centro.png",
+}
+
 
 class PenaltyMatch:
     def __init__(
@@ -6020,6 +6032,7 @@ class PenaltyMatch:
         self.shooter_choice: str | None = None
         self.keeper_choice: str | None = None
         self.last_action_desc: str = "🧤 *¡El árbitro pita el inicio del partido! Que comience la tanda.*"
+        self.last_shot_image: str | None = None
         self.lock = asyncio.Lock()
         self.current_view: discord.ui.View | None = None
 
@@ -6031,7 +6044,7 @@ class PenaltyMatch:
     def current_keeper(self) -> discord.Member:
         return self.player_b if self.turn == 0 else self.player_a
 
-    def build_scoreboard_embed(self) -> discord.Embed:
+    def build_scoreboard_embed(self) -> tuple[discord.Embed, discord.File | None]:
         goals_a = self.score_a.count("🟢")
         goals_b = self.score_b.count("🟢")
 
@@ -6072,7 +6085,17 @@ class PenaltyMatch:
             ),
             color=discord.Color.gold(),
         )
-        return embed
+
+        file = None
+        if self.last_shot_image:
+            for folder in ["Penales", "penales"]:
+                img_path = ROOT / "assets" / folder / self.last_shot_image
+                if img_path.exists():
+                    file = discord.File(str(img_path), filename=self.last_shot_image)
+                    embed.set_image(url=f"attachment://{self.last_shot_image}")
+                    break
+
+        return embed, file
 
     async def resolve_turn(self, interaction: discord.Interaction):
         async with self.lock:
@@ -6107,6 +6130,10 @@ class PenaltyMatch:
                     f"🧤 {keeper.display_name} adivinó el tiro a la **{keeper_dir}** y contuvo la pelota."
                 )
 
+            # Asignar imagen del resultado de este tiro
+            img_filename = PENALTY_IMAGES.get((self.shooter_choice, self.keeper_choice))
+            self.last_shot_image = img_filename
+
             if self.turn == 0:
                 self.score_a.append(symbol)
                 self.turn = 1
@@ -6115,9 +6142,12 @@ class PenaltyMatch:
                 if self.current_view:
                     self.current_view.stop()
                 self.current_view = PenaltyGameView(self)
-                embed = self.build_scoreboard_embed()
+                embed, file = self.build_scoreboard_embed()
                 try:
-                    await self.message.edit(embed=embed, view=self.current_view)
+                    if file:
+                        await self.message.edit(embed=embed, view=self.current_view, attachments=[file])
+                    else:
+                        await self.message.edit(embed=embed, view=self.current_view)
                 except Exception:
                     pass
                 return
@@ -6189,8 +6219,21 @@ class PenaltyMatch:
                     ),
                     color=discord.Color.green(),
                 )
+
+                file = None
+                if self.last_shot_image:
+                    for folder in ["Penales", "penales"]:
+                        img_path = ROOT / "assets" / folder / self.last_shot_image
+                        if img_path.exists():
+                            file = discord.File(str(img_path), filename=self.last_shot_image)
+                            final_embed.set_image(url=f"attachment://{self.last_shot_image}")
+                            break
+
                 try:
-                    await self.message.edit(embed=final_embed, view=None)
+                    if file:
+                        await self.message.edit(embed=final_embed, view=None, attachments=[file])
+                    else:
+                        await self.message.edit(embed=final_embed, view=None)
                 except Exception:
                     pass
                 return
@@ -6198,9 +6241,12 @@ class PenaltyMatch:
             if self.current_view:
                 self.current_view.stop()
             self.current_view = PenaltyGameView(self)
-            embed = self.build_scoreboard_embed()
+            embed, file = self.build_scoreboard_embed()
             try:
-                await self.message.edit(embed=embed, view=self.current_view)
+                if file:
+                    await self.message.edit(embed=embed, view=self.current_view, attachments=[file])
+                else:
+                    await self.message.edit(embed=embed, view=self.current_view)
             except Exception:
                 pass
 
@@ -6343,8 +6389,11 @@ class PenaltyInviteView(discord.ui.View):
         match = PenaltyMatch(interaction.guild, self.challenger, self.challenged, self.bet, interaction.message)
         game_view = PenaltyGameView(match)
         match.current_view = game_view
-        embed = match.build_scoreboard_embed()
-        await interaction.response.edit_message(content=None, embed=embed, view=game_view)
+        embed, file = match.build_scoreboard_embed()
+        if file:
+            await interaction.response.edit_message(content=None, embed=embed, view=game_view, attachments=[file])
+        else:
+            await interaction.response.edit_message(content=None, embed=embed, view=game_view)
 
     @discord.ui.button(label="Arrugar / Rechazar", emoji="🏃", style=discord.ButtonStyle.danger)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
