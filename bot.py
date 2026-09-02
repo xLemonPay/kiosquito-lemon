@@ -5991,6 +5991,7 @@ async def admin_apuestas_quiniela_cmd(interaction: discord.Interaction):
 # ==============================================================================
 
 ACTIVE_PENALTY_DUELS: set[int] = set()
+LAST_PENALTY_MESSAGES: dict[int, discord.Message] = {}
 
 PENALTY_IMAGES = {
     ("der", "der"): "01_Atajada_Derecha.png",
@@ -6236,6 +6237,9 @@ class PenaltyMatch:
                         await self.message.edit(embed=final_embed, view=None)
                 except Exception:
                     pass
+
+                # Borrar automáticamente el mensaje del partido tras 2 minutos
+                asyncio.create_task(auto_delete_message(self.message, 120))
                 return
 
             if self.current_view:
@@ -6273,6 +6277,7 @@ class PenaltyGameView(discord.ui.View):
                 conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (self.match.bet, self.match.guild.id, self.match.player_a.id))
                 conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (self.match.bet, self.match.guild.id, self.match.player_b.id))
             await self.match.message.edit(embed=embed, view=None)
+            asyncio.create_task(auto_delete_message(self.match.message, 10))
         except Exception:
             pass
 
@@ -6345,6 +6350,7 @@ class PenaltyInviteView(discord.ui.View):
         if self.message:
             try:
                 await self.message.edit(content=f"⏱️ El desafío de penales hacia {self.challenged.mention} expiró por falta de respuesta.", embed=None, view=None)
+                asyncio.create_task(auto_delete_message(self.message, 10))
             except Exception:
                 pass
 
@@ -6407,6 +6413,8 @@ class PenaltyInviteView(discord.ui.View):
 
         msg = f"🏃 {self.challenged.mention} arrugó y rechazó el duelo de penales." if interaction.user.id == self.challenged.id else f"🛑 {self.challenger.mention} canceló su desafío de penales."
         await interaction.response.edit_message(content=msg, embed=None, view=None)
+        if self.message:
+            asyncio.create_task(auto_delete_message(self.message, 10))
 
 
 @bot.tree.command(name="admin_test_penales", description="[Admin Test] Probar el sistema de duelo de penales 1v1.")
@@ -6450,6 +6458,14 @@ async def admin_test_penales_cmd(
         ephemeral=True,
     )
 
+    # Borrar mensaje anterior de penales en este canal si aún existe
+    prev_msg = LAST_PENALTY_MESSAGES.pop(interaction.channel_id, None)
+    if prev_msg:
+        try:
+            await prev_msg.delete()
+        except (discord.NotFound, discord.HTTPException):
+            pass
+
     embed = discord.Embed(
         title="🏟️ ¡DESAFÍO DE PENALES EN EL POTRERO! ⚽🔥",
         description=(
@@ -6464,6 +6480,7 @@ async def admin_test_penales_cmd(
     view = PenaltyInviteView(challenger=interaction.user, challenged=usuario, bet=apuesta)
     msg = await interaction.channel.send(content=usuario.mention, embed=embed, view=view)
     view.message = msg
+    LAST_PENALTY_MESSAGES[interaction.channel_id] = msg
 
 
 # ---------- AUTOCOMPLETES DINÁMICOS ----------
