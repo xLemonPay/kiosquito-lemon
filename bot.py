@@ -6015,10 +6015,13 @@ class PenaltyMatch:
         self.turn = 0  # 0: A patea & B ataja, 1: B patea & A ataja
         self.is_sudden_death = False
 
+        self.is_finished = False
+
         self.shooter_choice: str | None = None
         self.keeper_choice: str | None = None
         self.last_action_desc: str = "🧤 *¡El árbitro pita el inicio del partido! Que comience la tanda.*"
         self.lock = asyncio.Lock()
+        self.current_view: discord.ui.View | None = None
 
     @property
     def current_shooter(self) -> discord.Member:
@@ -6109,10 +6112,12 @@ class PenaltyMatch:
                 self.turn = 1
                 self.shooter_choice = None
                 self.keeper_choice = None
-                view = PenaltyGameView(self)
+                if self.current_view:
+                    self.current_view.stop()
+                self.current_view = PenaltyGameView(self)
                 embed = self.build_scoreboard_embed()
                 try:
-                    await self.message.edit(embed=embed, view=view)
+                    await self.message.edit(embed=embed, view=self.current_view)
                 except Exception:
                     pass
                 return
@@ -6157,6 +6162,10 @@ class PenaltyMatch:
                     self.last_action_desc += "\n\n🔥 **¡Sigue el empate en muerte súbita! Se juega otra ronda de 1 penal cada uno.**"
 
             if game_over and winner:
+                self.is_finished = True
+                if self.current_view:
+                    self.current_view.stop()
+
                 loser = self.player_b if winner == self.player_a else self.player_a
                 with get_connection() as conn:
                     ensure_user(conn, self.guild.id, winner.id)
@@ -6186,10 +6195,12 @@ class PenaltyMatch:
                     pass
                 return
 
-            view = PenaltyGameView(self)
+            if self.current_view:
+                self.current_view.stop()
+            self.current_view = PenaltyGameView(self)
             embed = self.build_scoreboard_embed()
             try:
-                await self.message.edit(embed=embed, view=view)
+                await self.message.edit(embed=embed, view=self.current_view)
             except Exception:
                 pass
 
@@ -6200,6 +6211,8 @@ class PenaltyGameView(discord.ui.View):
         self.match = match
 
     async def on_timeout(self):
+        if self.match.is_finished:
+            return
         ACTIVE_PENALTY_DUELS.discard(self.match.player_a.id)
         ACTIVE_PENALTY_DUELS.discard(self.match.player_b.id)
         try:
@@ -6295,6 +6308,8 @@ class PenaltyInviteView(discord.ui.View):
             await interaction.response.send_message(f"⏳ Este desafío es para {self.challenged.mention}. Solo él puede aceptar el reto.", ephemeral=True)
             return
 
+        self.stop()
+
         with get_connection() as conn:
             ensure_user(conn, interaction.guild_id, self.challenger.id)
             ensure_user(conn, interaction.guild_id, self.challenged.id)
@@ -6327,6 +6342,7 @@ class PenaltyInviteView(discord.ui.View):
 
         match = PenaltyMatch(interaction.guild, self.challenger, self.challenged, self.bet, interaction.message)
         game_view = PenaltyGameView(match)
+        match.current_view = game_view
         embed = match.build_scoreboard_embed()
         await interaction.response.edit_message(content=None, embed=embed, view=game_view)
 
@@ -6336,6 +6352,7 @@ class PenaltyInviteView(discord.ui.View):
             await interaction.response.send_message(f"❌ Solo {self.challenged.mention} o {self.challenger.mention} pueden responder.", ephemeral=True)
             return
 
+        self.stop()
         ACTIVE_PENALTY_DUELS.discard(self.challenger.id)
         ACTIVE_PENALTY_DUELS.discard(self.challenged.id)
 
