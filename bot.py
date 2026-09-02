@@ -6044,20 +6044,28 @@ class PenaltyMatch:
 
         mode_badge = "🔥 **Muerte Súbita (Gol Gana de Diferencia)**" if self.is_sudden_death else "⚽ **Tanda Regular (3 Penales)**"
 
+        shooter = self.current_shooter
+        keeper = self.current_keeper
+
+        role_banner = (
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🧤 **AL ARCO (LE TOCA ATAJAR):** **`@{keeper.display_name}`** 🥅\n"
+            f"*(¡@{keeper.display_name}, elegí hacia qué lado tirarte a atajar!)*\n\n"
+            f"👟 **PATEA EL PENAL:** **`@{shooter.display_name}`** ⚽\n"
+            f"*(¡@{shooter.display_name}, elegí hacia qué lado vas a patear!)*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        )
+
         embed = discord.Embed(
             title="🏟️ DUELO DE PENALES — POTRERO DEL KIOSQUITO ⚽🔥",
             description=(
                 f"💰 **Pozo en juego:** **{money(self.pot)}** *({money(self.bet)} c/u)*\n"
-                f"🏆 Modalidad: {mode_badge}\n\n"
+                f"🏆 Modalidad: {mode_badge} • **Ronda {self.round_num}**\n\n"
                 f"👤 **{self.player_a.display_name}:** `{display_a.strip()}` **({goals_a} Goles)**\n"
                 f"👤 **{self.player_b.display_name}:** `{display_b.strip()}` **({goals_b} Goles)**\n\n"
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"{self.last_action_desc}\n"
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"⚡ **Ronda {self.round_num} • Tiro:**\n"
-                f"👟 **Pateador:** {self.current_shooter.mention}\n"
-                f"🧤 **Arquero:** {self.current_keeper.mention}\n\n"
-                "👇 *Elegí en secreto hacia dónde patear / tirarte con los botones:*"
+                f"{self.last_action_desc}\n\n"
+                f"{role_banner}\n\n"
+                "👇 *Elegí tu dirección en secreto con los botones de abajo:*"
             ),
             color=discord.Color.gold(),
         )
@@ -6226,14 +6234,22 @@ class PenaltyGameView(discord.ui.View):
                 await interaction.response.send_message("⏳ Ya elegiste hacia dónde patear. Esperando al arquero...", ephemeral=True)
                 return
             self.match.shooter_choice = direction
-            await interaction.response.send_message(f"👟 Elegiste patear a la **{dir_name}** 🤫 (elección secreta).", ephemeral=True)
+            await interaction.response.send_message(
+                f"👟 **[ESTÁS PATEANDO]** Elegiste patear a la **{dir_name}** ⚽🤫.\n"
+                f"⏳ Esperando que el arquero **@{keeper.display_name}** decida hacia dónde tirarse...",
+                ephemeral=True,
+            )
 
         elif uid == keeper.id:
             if self.match.keeper_choice is not None:
                 await interaction.response.send_message("⏳ Ya elegiste hacia dónde tirarte. Esperando al pateador...", ephemeral=True)
                 return
             self.match.keeper_choice = direction
-            await interaction.response.send_message(f"🧤 Elegiste tirarte a la **{dir_name}** 🤫 (elección secreta).", ephemeral=True)
+            await interaction.response.send_message(
+                f"🧤 **[ESTÁS ATAJANDO]** Elegiste tirarte a la **{dir_name}** 🥅🤫.\n"
+                f"⏳ Esperando que el pateador **@{shooter.display_name}** ejecute el tiro...",
+                ephemeral=True,
+            )
 
         if self.match.shooter_choice is not None and self.match.keeper_choice is not None:
             await self.match.resolve_turn(interaction)
@@ -6265,7 +6281,7 @@ class PenaltyInviteView(discord.ui.View):
     @discord.ui.button(label="Aceptar Duelo", emoji="🧤", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.challenged.id:
-            await interaction.response.send_message("❌ Solo el jugador retado puede aceptar este desafío.", ephemeral=True)
+            await interaction.response.send_message(f"⏳ Este desafío es para {self.challenged.mention}. Solo él puede aceptar.", ephemeral=True)
             return
 
         with get_connection() as conn:
@@ -6306,13 +6322,13 @@ class PenaltyInviteView(discord.ui.View):
     @discord.ui.button(label="Arrugar / Rechazar", emoji="🏃", style=discord.ButtonStyle.danger)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.challenged.id and interaction.user.id != self.challenger.id:
-            await interaction.response.send_message("❌ No sos parte de este desafío.", ephemeral=True)
+            await interaction.response.send_message(f"❌ Solo {self.challenged.mention} o {self.challenger.mention} pueden responder.", ephemeral=True)
             return
 
         ACTIVE_PENALTY_DUELS.discard(self.challenger.id)
         ACTIVE_PENALTY_DUELS.discard(self.challenged.id)
 
-        msg = f"🏃 {self.challenged.mention} arrugó y rechazó el duelo de penales." if interaction.user.id == self.challenged.id else f"🛑 {self.challenger.mention} canceló el reto de penales."
+        msg = f"🏃 {self.challenged.mention} arrugó y rechazó el duelo de penales." if interaction.user.id == self.challenged.id else f"🛑 {self.challenger.mention} canceló su desafío de penales."
         await interaction.response.edit_message(content=msg, embed=None, view=None)
 
 
@@ -6358,7 +6374,8 @@ async def admin_test_penales_cmd(
             f"💵 **Apuesta:** **{money(apuesta)}** cada uno\n"
             f"💰 **Pozo Total:** **{money(apuesta * 2)}**\n"
             "📋 **Reglas:** 3 penales por lado. En caso de empate, ¡muerte súbita (gol gana de diferencia)!\n\n"
-            f"👉 {usuario.mention}, ¿aceptás el reto?"
+            f"👉 **{usuario.mention}**, ¿aceptás el reto?\n"
+            "*(Solo el jugador invitado puede aceptar)*"
         ),
         color=discord.Color.gold(),
     )
