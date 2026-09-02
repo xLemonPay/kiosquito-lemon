@@ -3942,14 +3942,18 @@ class ProductSelect(discord.ui.Select):
             else:
                 price_text = money(price)
 
-            stock_text = f"Stock: {stock}" if stock > 0 else "AGOTADO 🚫"
+            if p["id"] == "lemon_black":
+                opt_desc = "Membresía VIP • 15% OFF de por vida"
+            else:
+                stock_text = f"Stock: {stock}" if stock > 0 else "AGOTADO 🚫"
+                opt_desc = f"{stock_text} • +{p['xp']} XP al consumir"
 
             options.append(
                 discord.SelectOption(
                     label=f"{p['name']} — {price_text}",
                     value=p["id"],
                     emoji=p["emoji"],
-                    description=f"{stock_text} • +{p['xp']} XP al consumir",
+                    description=opt_desc[:100],
                 )
             )
 
@@ -3971,12 +3975,26 @@ class ProductSelect(discord.ui.Select):
         else:
             price_desc = f"💵 **Precio:** {money(price)}"
 
-        stock_desc = f"📦 **Stock disponible:** `{stock}` unidades" if stock > 0 else "🚫 **Estado:** ¡AGOTADO!"
+        if product["id"] == "lemon_black":
+            stock_desc = "📦 **Disponibilidad:** Ilimitada (Membresía VIP)"
+            desc = (
+                f"{product['description']}\n\n"
+                f"{price_desc}\n{stock_desc}\n\n"
+                "👑 **Beneficios exclusivos:**\n"
+                "• 🏷️ **15% de descuento permanente** en todas las golosinas del mostrador.\n"
+                "• 👑 **Rol exclusivo `@Lemon Black`** en Discord.\n"
+                "• 💳 **Insignia VIP** en tu tarjeta de `/perfil`."
+            )
+            embed_color = discord.Color.from_rgb(45, 45, 45)
+        else:
+            stock_desc = f"📦 **Stock disponible:** `{stock}` unidades" if stock > 0 else "🚫 **Estado:** ¡AGOTADO!"
+            desc = f"{product['description']}\n\n{price_desc}\n{stock_desc}\n⭐ **Al consumir:** `+{product['xp']} XP`"
+            embed_color = discord.Color.gold()
 
         embed = discord.Embed(
             title=f"{product['emoji']} {product['name']}",
-            description=f"{product['description']}\n\n{price_desc}\n{stock_desc}\n⭐ **Al consumir:** `+{product['xp']} XP`",
-            color=discord.Color.gold(),
+            description=desc,
+            color=embed_color,
         )
         embed.add_field(name="💵 Tu Billetera", value=money(user["money"]), inline=True)
         embed.add_field(name="🧾 Tu Deuda", value=money(user["debt"]), inline=True)
@@ -4004,6 +4022,9 @@ class ProductDetailView(discord.ui.View):
         self.product_id = product_id
         self.owner_id = owner_id
         self.interaction = parent_interaction
+        if product_id == "lemon_black":
+            self.buy_five.disabled = True
+            self.buy_five.style = discord.ButtonStyle.secondary
 
     async def on_timeout(self):
         try:
@@ -4031,7 +4052,13 @@ class ProductDetailView(discord.ui.View):
         )
 
         if not ok:
-            if reason == "out_of_stock":
+            if reason == "already_lemon_black":
+                embed = discord.Embed(
+                    title="💳 Ya sos Miembro Lemon Black VIP",
+                    description="¡Ya contás con la **Tarjeta Lemon Black** activa!\nDisfrutás de un **15% de descuento permanente** en todas las compras del mostrador.",
+                    color=discord.Color.from_rgb(45, 45, 45),
+                )
+            elif reason == "out_of_stock":
                 embed = discord.Embed(
                     title=f"🚫 Stock insuficiente de {product['name']}",
                     description=(
@@ -4051,6 +4078,38 @@ class ProductDetailView(discord.ui.View):
                 )
             embed.set_footer(text="Elegí otro producto o volvé a la góndola.")
             await interaction.response.edit_message(embed=embed, view=self)
+            return
+
+        if self.product_id == "lemon_black":
+            role = await get_or_create_lemon_black_role(interaction.guild)
+            if role and isinstance(interaction.user, discord.Member):
+                try:
+                    await interaction.user.add_roles(role, reason="Compra de Tarjeta Lemon Black en la Góndola")
+                except Exception:
+                    pass
+
+            embed = discord.Embed(
+                title="👑 ¡BIENVENIDO AL CLUB LEMON BLACK VIP! 💳✨",
+                description=(
+                    f"¡Felicitaciones {interaction.user.mention}! Adquiriste la **Tarjeta Lemon Black**.\n\n"
+                    "**Tus beneficios ya están activos:**\n"
+                    "• 🏷️ **15% de descuento** en todas tus compras del kiosquito.\n"
+                    "• 👑 **Rol `@Lemon Black`** asignado en el servidor.\n"
+                    "• 💳 **Insignia VIP** agregada a tu `/perfil`.\n\n"
+                    f"💼 **Saldo restante:** **{money(balance)}**"
+                ),
+                color=discord.Color.from_rgb(45, 45, 45),
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+
+            if interaction.channel:
+                try:
+                    msg = await interaction.channel.send(
+                        f"💳✨ **¡ATENCIÓN VECINOS!** {interaction.user.mention} acaba de adquirir la **Tarjeta Lemon Black VIP** en el mostrador 🍾🎩. ¡Un verdadero magnate del kiosquito!"
+                    )
+                    record_consumption_message(interaction.guild_id, interaction.channel_id, msg.id)
+                except Exception:
+                    pass
             return
 
         price, is_sale, _ = get_product_price(interaction.guild_id, self.product_id)
@@ -4856,7 +4915,12 @@ async def comprar(
     )
 
     if not ok:
-        if reason == "out_of_stock":
+        if reason == "already_lemon_black":
+            await interaction.response.send_message(
+                "💳 **¡Ya sos Miembro Lemon Black VIP!** Tenés tu 15% de descuento activo en todas las golosinas.",
+                ephemeral=True,
+            )
+        elif reason == "out_of_stock":
             await interaction.response.send_message(
                 f"🚫 No hay suficiente stock de **{p['name']}**. Quedan **{remaining_stock} un.** en el mostrador.",
                 ephemeral=True,
@@ -4869,6 +4933,39 @@ async def comprar(
                 ephemeral=True,
             )
         asyncio.create_task(auto_delete_interaction(interaction, 180))
+        return
+
+    if producto == "lemon_black":
+        role = await get_or_create_lemon_black_role(interaction.guild)
+        if role and isinstance(interaction.user, discord.Member):
+            try:
+                await interaction.user.add_roles(role, reason="Compra de Tarjeta Lemon Black VIP")
+            except Exception:
+                pass
+
+        embed = discord.Embed(
+            title="👑 ¡BIENVENIDO AL CLUB LEMON BLACK VIP! 💳✨",
+            description=(
+                f"¡Felicitaciones {interaction.user.mention}! Adquiriste la **Tarjeta Lemon Black**.\n\n"
+                "**Tus beneficios ya están activos:**\n"
+                "• 🏷️ **15% de descuento** en todas tus compras del kiosquito.\n"
+                "• 👑 **Rol `@Lemon Black`** asignado en el servidor.\n"
+                "• 💳 **Insignia VIP** agregada a tu `/perfil`.\n\n"
+                f"💼 **Saldo restante:** **{money(balance)}**"
+            ),
+            color=discord.Color.from_rgb(45, 45, 45),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+        if interaction.channel:
+            try:
+                msg = await interaction.channel.send(
+                    f"💳✨ **¡ATENCIÓN VECINOS!** {interaction.user.mention} acaba de adquirir la **Tarjeta Lemon Black VIP** 🍾🎩. ¡Un verdadero magnate del kiosquito!"
+                )
+                record_consumption_message(interaction.guild_id, interaction.channel_id, msg.id)
+            except Exception:
+                pass
         return
 
     await interaction.response.send_message(
