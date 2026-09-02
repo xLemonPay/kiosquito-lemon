@@ -5986,6 +5986,386 @@ async def admin_apuestas_quiniela_cmd(interaction: discord.Interaction):
     asyncio.create_task(auto_delete_interaction(interaction, 180))
 
 
+# ==============================================================================
+#                      SISTEMA DE DUELO DE PENALES (1v1)
+# ==============================================================================
+
+ACTIVE_PENALTY_DUELS: set[int] = set()
+
+
+class PenaltyMatch:
+    def __init__(
+        self,
+        guild: discord.Guild,
+        player_a: discord.Member,
+        player_b: discord.Member,
+        bet: int,
+        message: discord.Message,
+    ):
+        self.guild = guild
+        self.player_a = player_a
+        self.player_b = player_b
+        self.bet = bet
+        self.pot = bet * 2
+        self.message = message
+
+        self.score_a: list[str] = []
+        self.score_b: list[str] = []
+        self.round_num = 1
+        self.turn = 0  # 0: A patea & B ataja, 1: B patea & A ataja
+        self.is_sudden_death = False
+
+        self.shooter_choice: str | None = None
+        self.keeper_choice: str | None = None
+        self.last_action_desc: str = "🧤 *¡El árbitro pita el inicio del partido! Que comience la tanda.*"
+        self.lock = asyncio.Lock()
+
+    @property
+    def current_shooter(self) -> discord.Member:
+        return self.player_a if self.turn == 0 else self.player_b
+
+    @property
+    def current_keeper(self) -> discord.Member:
+        return self.player_b if self.turn == 0 else self.player_a
+
+    def build_scoreboard_embed(self) -> discord.Embed:
+        goals_a = self.score_a.count("🟢")
+        goals_b = self.score_b.count("🟢")
+
+        max_slots = 3 if not self.is_sudden_death else max(len(self.score_a), len(self.score_b), self.round_num)
+
+        display_a = " ".join(self.score_a)
+        if len(self.score_a) < max_slots:
+            display_a += " " + " ".join(["⚪"] * (max_slots - len(self.score_a)))
+
+        display_b = " ".join(self.score_b)
+        if len(self.score_b) < max_slots:
+            display_b += " " + " ".join(["⚪"] * (max_slots - len(self.score_b)))
+
+        mode_badge = "🔥 **Muerte Súbita (Gol Gana de Diferencia)**" if self.is_sudden_death else "⚽ **Tanda Regular (3 Penales)**"
+
+        embed = discord.Embed(
+            title="🏟️ DUELO DE PENALES — POTRERO DEL KIOSQUITO ⚽🔥",
+            description=(
+                f"💰 **Pozo en juego:** **{money(self.pot)}** *({money(self.bet)} c/u)*\n"
+                f"🏆 Modalidad: {mode_badge}\n\n"
+                f"👤 **{self.player_a.display_name}:** `{display_a.strip()}` **({goals_a} Goles)**\n"
+                f"👤 **{self.player_b.display_name}:** `{display_b.strip()}` **({goals_b} Goles)**\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"{self.last_action_desc}\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"⚡ **Ronda {self.round_num} • Tiro:**\n"
+                f"👟 **Pateador:** {self.current_shooter.mention}\n"
+                f"🧤 **Arquero:** {self.current_keeper.mention}\n\n"
+                "👇 *Elegí en secreto hacia dónde patear / tirarte con los botones:*"
+            ),
+            color=discord.Color.gold(),
+        )
+        return embed
+
+    async def resolve_turn(self, interaction: discord.Interaction):
+        async with self.lock:
+            if self.shooter_choice is None or self.keeper_choice is None:
+                return
+
+            dir_map = {
+                "izq": "⬅️ Izquierda",
+                "centro": "⬆️ Centro",
+                "der": "➡️ Derecha",
+            }
+
+            shooter_dir = dir_map.get(self.shooter_choice, self.shooter_choice)
+            keeper_dir = dir_map.get(self.keeper_choice, self.keeper_choice)
+
+            shooter = self.current_shooter
+            keeper = self.current_keeper
+
+            is_goal = self.shooter_choice != self.keeper_choice
+
+            if is_goal:
+                symbol = "🟢"
+                self.last_action_desc = (
+                    f"⚽🔥 **¡GOOOOOL DE {shooter.display_name}!**\n"
+                    f"👟 {shooter.display_name} la clavó a la **{shooter_dir}**.\n"
+                    f"🧤 {keeper.display_name} se tiró a la **{keeper_dir}** y no llegó."
+                )
+            else:
+                symbol = "🔴"
+                self.last_action_desc = (
+                    f"🧤❌ **¡ATAJADÓN DE {keeper.display_name}!**\n"
+                    f"🧤 {keeper.display_name} adivinó el tiro a la **{keeper_dir}** y contuvo la pelota."
+                )
+
+            if self.turn == 0:
+                self.score_a.append(symbol)
+                self.turn = 1
+                self.shooter_choice = None
+                self.keeper_choice = None
+                view = PenaltyGameView(self)
+                embed = self.build_scoreboard_embed()
+                try:
+                    await self.message.edit(embed=embed, view=view)
+                except Exception:
+                    pass
+                return
+
+            # Turno 1 finalizado (ambos patearon en esta ronda)
+            self.score_b.append(symbol)
+            self.shooter_choice = None
+            self.keeper_choice = None
+
+            goals_a = self.score_a.count("🟢")
+            goals_b = self.score_b.count("🟢")
+
+            game_over = False
+            winner = None
+
+            if not self.is_sudden_death:
+                if self.round_num < 3:
+                    self.round_num += 1
+                    self.turn = 0
+                else:
+                    if goals_a > goals_b:
+                        game_over = True
+                        winner = self.player_a
+                    elif goals_b > goals_a:
+                        game_over = True
+                        winner = self.player_b
+                    else:
+                        self.is_sudden_death = True
+                        self.round_num += 1
+                        self.turn = 0
+                        self.last_action_desc += "\n\n🔥 **¡EMPATE TRAS LOS 3 PENALES! ¡ARRANCA LA MUERTE SÚBITA (GOL GANA)!**"
+            else:
+                if goals_a > goals_b:
+                    game_over = True
+                    winner = self.player_a
+                elif goals_b > goals_a:
+                    game_over = True
+                    winner = self.player_b
+                else:
+                    self.round_num += 1
+                    self.turn = 0
+                    self.last_action_desc += "\n\n🔥 **¡Sigue el empate en muerte súbita! Se juega otra ronda de 1 penal cada uno.**"
+
+            if game_over and winner:
+                loser = self.player_b if winner == self.player_a else self.player_a
+                with get_connection() as conn:
+                    ensure_user(conn, self.guild.id, winner.id)
+                    conn.execute("UPDATE users SET money=money+?, xp=xp+50 WHERE guild_id=? AND user_id=?", (self.pot, self.guild.id, winner.id))
+
+                ACTIVE_PENALTY_DUELS.discard(self.player_a.id)
+                ACTIVE_PENALTY_DUELS.discard(self.player_b.id)
+
+                final_embed = discord.Embed(
+                    title="🏆 ¡HAY CAMPEÓN DE LOS PENALES! 🍾⚽",
+                    description=(
+                        f"👑 **¡{winner.mention} SE LLEVA LA VICTORIA!**\n\n"
+                        f"💵 **Premio:** **+{money(self.pot)}** *(Pozo acumulado)*\n"
+                        f"⭐ **Experiencia:** **+50 XP**\n\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"📊 **Marcador Final:**\n"
+                        f"👤 **{self.player_a.display_name}:** `{' '.join(self.score_a)}` **({goals_a} Goles)**\n"
+                        f"👤 **{self.player_b.display_name}:** `{' '.join(self.score_b)}` **({goals_b} Goles)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"🧔 **El Kiosquero:** *«¡Qué partidazo, señores! Felicitaciones a {winner.display_name} y buen intento de {loser.display_name}.»*"
+                    ),
+                    color=discord.Color.green(),
+                )
+                try:
+                    await self.message.edit(embed=final_embed, view=None)
+                except Exception:
+                    pass
+                return
+
+            view = PenaltyGameView(self)
+            embed = self.build_scoreboard_embed()
+            try:
+                await self.message.edit(embed=embed, view=view)
+            except Exception:
+                pass
+
+
+class PenaltyGameView(discord.ui.View):
+    def __init__(self, match: PenaltyMatch):
+        super().__init__(timeout=120)
+        self.match = match
+
+    async def on_timeout(self):
+        ACTIVE_PENALTY_DUELS.discard(self.match.player_a.id)
+        ACTIVE_PENALTY_DUELS.discard(self.match.player_b.id)
+        try:
+            embed = discord.Embed(
+                title="⏱️ Duelo de Penales Cancelado",
+                description="El partido se canceló por inactividad. Los fondos han sido reembolsados si el duelo no finalizó.",
+                color=discord.Color.red(),
+            )
+            with get_connection() as conn:
+                ensure_user(conn, self.match.guild.id, self.match.player_a.id)
+                ensure_user(conn, self.match.guild.id, self.match.player_b.id)
+                conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (self.match.bet, self.match.guild.id, self.match.player_a.id))
+                conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (self.match.bet, self.match.guild.id, self.match.player_b.id))
+            await self.match.message.edit(embed=embed, view=None)
+        except Exception:
+            pass
+
+    async def handle_choice(self, interaction: discord.Interaction, direction: str):
+        uid = interaction.user.id
+        shooter = self.match.current_shooter
+        keeper = self.match.current_keeper
+
+        if uid not in (shooter.id, keeper.id):
+            await interaction.response.send_message("❌ No sos parte de este duelo de penales.", ephemeral=True)
+            return
+
+        dir_names = {"izq": "⬅️ Izquierda", "centro": "⬆️ Centro", "der": "➡️ Derecha"}
+        dir_name = dir_names.get(direction, direction)
+
+        if uid == shooter.id:
+            if self.match.shooter_choice is not None:
+                await interaction.response.send_message("⏳ Ya elegiste hacia dónde patear. Esperando al arquero...", ephemeral=True)
+                return
+            self.match.shooter_choice = direction
+            await interaction.response.send_message(f"👟 Elegiste patear a la **{dir_name}** 🤫 (elección secreta).", ephemeral=True)
+
+        elif uid == keeper.id:
+            if self.match.keeper_choice is not None:
+                await interaction.response.send_message("⏳ Ya elegiste hacia dónde tirarte. Esperando al pateador...", ephemeral=True)
+                return
+            self.match.keeper_choice = direction
+            await interaction.response.send_message(f"🧤 Elegiste tirarte a la **{dir_name}** 🤫 (elección secreta).", ephemeral=True)
+
+        if self.match.shooter_choice is not None and self.match.keeper_choice is not None:
+            await self.match.resolve_turn(interaction)
+
+    @discord.ui.button(label="Izquierda", emoji="⬅️", style=discord.ButtonStyle.primary)
+    async def btn_left(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_choice(interaction, "izq")
+
+    @discord.ui.button(label="Al Centro", emoji="⬆️", style=discord.ButtonStyle.primary)
+    async def btn_center(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_choice(interaction, "centro")
+
+    @discord.ui.button(label="Derecha", emoji="➡️", style=discord.ButtonStyle.primary)
+    async def btn_right(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_choice(interaction, "der")
+
+
+class PenaltyInviteView(discord.ui.View):
+    def __init__(self, challenger: discord.Member, challenged: discord.Member, bet: int):
+        super().__init__(timeout=60)
+        self.challenger = challenger
+        self.challenged = challenged
+        self.bet = bet
+
+    async def on_timeout(self):
+        ACTIVE_PENALTY_DUELS.discard(self.challenger.id)
+        ACTIVE_PENALTY_DUELS.discard(self.challenged.id)
+
+    @discord.ui.button(label="Aceptar Duelo", emoji="🧤", style=discord.ButtonStyle.success)
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.challenged.id:
+            await interaction.response.send_message("❌ Solo el jugador retado puede aceptar este desafío.", ephemeral=True)
+            return
+
+        with get_connection() as conn:
+            ensure_user(conn, interaction.guild_id, self.challenger.id)
+            ensure_user(conn, interaction.guild_id, self.challenged.id)
+
+            if self.bet > 0:
+                cur_a = conn.execute(
+                    "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
+                    (self.bet, interaction.guild_id, self.challenger.id, self.bet),
+                )
+                if cur_a.rowcount == 0:
+                    ACTIVE_PENALTY_DUELS.discard(self.challenger.id)
+                    ACTIVE_PENALTY_DUELS.discard(self.challenged.id)
+                    await interaction.response.send_message(
+                        f"❌ {self.challenger.mention} ya no tiene suficiente plata en la billetera.", ephemeral=True
+                    )
+                    return
+
+                cur_b = conn.execute(
+                    "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
+                    (self.bet, interaction.guild_id, self.challenged.id, self.bet),
+                )
+                if cur_b.rowcount == 0:
+                    conn.execute("UPDATE users SET money=money+? WHERE guild_id=? AND user_id=?", (self.bet, interaction.guild_id, self.challenger.id))
+                    ACTIVE_PENALTY_DUELS.discard(self.challenger.id)
+                    ACTIVE_PENALTY_DUELS.discard(self.challenged.id)
+                    await interaction.response.send_message(
+                        f"❌ No tenés suficiente plata en tu billetera para aceptar ({money(self.bet)}).", ephemeral=True
+                    )
+                    return
+
+        match = PenaltyMatch(interaction.guild, self.challenger, self.challenged, self.bet, interaction.message)
+        game_view = PenaltyGameView(match)
+        embed = match.build_scoreboard_embed()
+        await interaction.response.edit_message(content=None, embed=embed, view=game_view)
+
+    @discord.ui.button(label="Arrugar / Rechazar", emoji="🏃", style=discord.ButtonStyle.danger)
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.challenged.id and interaction.user.id != self.challenger.id:
+            await interaction.response.send_message("❌ No sos parte de este desafío.", ephemeral=True)
+            return
+
+        ACTIVE_PENALTY_DUELS.discard(self.challenger.id)
+        ACTIVE_PENALTY_DUELS.discard(self.challenged.id)
+
+        msg = f"🏃 {self.challenged.mention} arrugó y rechazó el duelo de penales." if interaction.user.id == self.challenged.id else f"🛑 {self.challenger.mention} canceló el reto de penales."
+        await interaction.response.edit_message(content=msg, embed=None, view=None)
+
+
+@bot.tree.command(name="admin_test_penales", description="[Admin Test] Probar el sistema de duelo de penales 1v1.")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(usuario="Usuario a retar a los penales", apuesta="Monto de la apuesta (opcional, $0 a $50.000)")
+@app_commands.guild_only()
+async def admin_test_penales_cmd(
+    interaction: discord.Interaction,
+    usuario: discord.Member,
+    apuesta: app_commands.Range[int, 0, 50000] = 500,
+):
+    if usuario.bot:
+        await interaction.response.send_message("❌ No podés retar a un bot a los penales.", ephemeral=True)
+        return
+
+    if usuario.id == interaction.user.id:
+        await interaction.response.send_message("❌ No podés retarte a vos mismo.", ephemeral=True)
+        return
+
+    if interaction.user.id in ACTIVE_PENALTY_DUELS or usuario.id in ACTIVE_PENALTY_DUELS:
+        await interaction.response.send_message("⏳ Uno de los dos jugadores ya tiene un duelo de penales en curso.", ephemeral=True)
+        return
+
+    user_a = get_user(interaction.guild_id, interaction.user.id)
+    user_b = get_user(interaction.guild_id, usuario.id)
+
+    if apuesta > 0:
+        if user_a["money"] < apuesta:
+            await interaction.response.send_message(f"💸 No te alcanza la plata. Tenés **{money(user_a['money'])}** y la apuesta es de **{money(apuesta)}**.", ephemeral=True)
+            return
+        if user_b["money"] < apuesta:
+            await interaction.response.send_message(f"💸 {usuario.mention} no tiene suficiente plata (tiene **{money(user_b['money'])}**).", ephemeral=True)
+            return
+
+    ACTIVE_PENALTY_DUELS.add(interaction.user.id)
+    ACTIVE_PENALTY_DUELS.add(usuario.id)
+
+    embed = discord.Embed(
+        title="🏟️ ¡DESAFÍO DE PENALES EN EL POTRERO! ⚽🔥",
+        description=(
+            f"🥊 **{interaction.user.mention}** retó a **{usuario.mention}** a un duelo de penales.\n\n"
+            f"💵 **Apuesta:** **{money(apuesta)}** cada uno\n"
+            f"💰 **Pozo Total:** **{money(apuesta * 2)}**\n"
+            "📋 **Reglas:** 3 penales por lado. En caso de empate, ¡muerte súbita (gol gana de diferencia)!\n\n"
+            f"👉 {usuario.mention}, ¿aceptás el reto?"
+        ),
+        color=discord.Color.gold(),
+    )
+    view = PenaltyInviteView(challenger=interaction.user, challenged=usuario, bet=apuesta)
+    await interaction.response.send_message(content=usuario.mention, embed=embed, view=view)
+
+
 # ---------- AUTOCOMPLETES DINÁMICOS ----------
 
 async def product_autocomplete(interaction: discord.Interaction, current: str):
