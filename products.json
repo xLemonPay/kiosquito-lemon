@@ -118,5 +118,13 @@
     "price": 1200,
     "xp": 26,
     "description": "Chocolatada fría, nivel recreo premium."
+  },
+  {
+    "id": "lemon_black",
+    "name": "Tarjeta Lemon Black",
+    "emoji": "💳",
+    "price": 50000,
+    "xp": 500,
+    "description": "Membresía VIP de estatus. 15% de descuento permanente en el mostrador y rol exclusivo."
   }
 ]

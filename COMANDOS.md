@@ -34,8 +34,8 @@
 
 ## 🎰 Lotería y Azar
 - `/raspadita` — Jugar a la Raspadita del Kiosquito en una grilla interactiva 3×3 (Límite: **20 cartones por día** por usuario). Costo: **$1.000** ($750 para Suscriptores y Boosters).
-  - 🍋 **`🍋 🍋 🍋` (0.5%):** ¡POZO ACUMULADO DEL SERVIDOR! (Arranca en $10.000 y acumula +$400 de cada tirada).
-  - 💎 **`💎 💎 💎` (7.5%):** Ganás **$3.500** en efectivo.
+  - 🍋 **`🍋 🍋 🍋` (0.15%):** ¡POZO ACUMULADO DEL SERVIDOR! (Arranca en $10.000 y acumula +$400 de cada tirada).
+  - 💎 **`💎 💎 💎` (7.85%):** Ganás **$3.500** en efectivo.
   - 🍫 **`🍫 🍫 🍫` (12%):** Ganás **$1.500** + 1 Alfajor Jorgito a tu mochila.
   - ❌ **Sin Premio (80%):** Se suman **+$400** al Pozo Acumulado.
 - `/quiniela [numero] [apuesta]` — Apostar a un número de la suerte (del 1 al 50) para el sorteo diario de las 22:00 hs (Máximo 3 apuestas por usuario por sorteo).
@@ -43,8 +43,13 @@
   - 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** la apuesta.
   - 🔔 Asigna el rol `@Quinielero` automáticamente para notificar en el sorteo en vivo.
 
+## 👑 Estatus VIP y Personalización
+- `/lemon_black` — Adquirir la **Tarjeta Lemon Black VIP** ($50.000) con **15% de descuento permanente** en todas las golosinas del mostrador, rol exclusivo `@Lemon Black` e insignia en tu `/perfil`.
+- `/titulo_comprar <texto>` — Comprar o cambiar un título personalizado visible en tu `/perfil` ($20.000, máx 32 caracteres).
+- `/apodo_servidor <nuevo_apodo>` — Cambiar tu apodo (nickname) en el servidor de Discord por plata ($35.000, máx 32 caracteres).
+
 ## 💵 Economía y Progresión
-- `/perfil [usuario]` — Saldo en billetera, XP acumulada, deuda y barra de progreso del fiado.
+- `/perfil [usuario]` — Saldo en billetera, XP acumulada, deuda, estado del fiado, títulos personalizados y membresía Lemon Black.
 - `/saldo` — Resumen rápido de dinero y deuda.
 - `/diario` — Recompensa diaria en plata y XP cada 24 horas.
 - `/fiado <producto> [cantidad]` — Comprar fiado anotando en la libretita (disponible a partir de 2.000 XP).
@@ -64,6 +69,8 @@
 - `/admin_dar_xp <usuario> <cantidad>` — Modifica la XP de un usuario.
 - `/admin_resetear <usuario>` — Resetea los datos e inventario de un usuario.
 - `/admin_resetear_raspaditas <usuario>` — Reinicia el límite diario de 20 raspaditas de un usuario para que pueda volver a jugar hoy.
+- `/admin_dar_lemon_black <usuario> <activado:True/False>` — Otorga o remueve la membresía Lemon Black VIP a un usuario.
+- `/admin_quitar_titulo <usuario>` — Elimina el título personalizado de un usuario.
 - `/autolimpieza <activado:True/False>` — Activa o desactiva el borrado automático de mensajes comunes en el canal del kiosco.
 - `/admin_sortear_quiniela` — Forzar o probar el sorteo de la Quiniela en vivo con animación de bolillero.
 - `/admin_quiniela_automatica <activado:True/False>` — Activa o desactiva los sorteos y avisos automáticos de las 22:00 hs.

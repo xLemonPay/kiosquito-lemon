@@ -695,6 +695,16 @@ def init_db() -> None:
             """
         )
 
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN has_lemon_black INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN custom_title TEXT NOT NULL DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+
 
 def get_setting(guild_id: int, key: str, default: str = "0") -> str:
     with get_connection() as conn:
@@ -1215,6 +1225,23 @@ async def schedule_quinielero_role_removal(guild: discord.Guild, role: discord.R
             pass
 
 
+async def get_or_create_lemon_black_role(guild: discord.Guild) -> discord.Role | None:
+    for r in guild.roles:
+        if "lemon black" in r.name.lower():
+            return r
+    try:
+        return await guild.create_role(
+            name="Lemon Black",
+            color=discord.Color.from_rgb(40, 40, 40),
+            hoist=True,
+            mentionable=False,
+            reason="Rol VIP Lemon Black del Kiosquito",
+        )
+    except Exception as e:
+        print(f"Aviso al crear rol Lemon Black: {e}")
+        return None
+
+
 def manual_open_status(guild_id: int) -> tuple[bool, int | None]:
     raw = get_setting(guild_id, "manual_open_until", "0")
     try:
@@ -1240,8 +1267,8 @@ def ensure_user(conn: sqlite3.Connection, guild_id: int, user_id: int) -> None:
     conn.execute(
         """
         INSERT OR IGNORE INTO users
-        (guild_id, user_id, money, xp, debt, last_daily, last_work, created_at)
-        VALUES (?, ?, ?, 0, 0, 0, 0, ?)
+        (guild_id, user_id, money, xp, debt, last_daily, last_work, created_at, has_lemon_black, custom_title)
+        VALUES (?, ?, ?, 0, 0, 0, 0, ?, 0, '')
         """,
         (guild_id, user_id, CONFIG["starting_money"], int(time.time())),
     )
@@ -1285,8 +1312,9 @@ def add_xp(guild_id: int, user_id: int, amount: int) -> int:
 
 
 def normal_purchase(guild_id: int, user_id: int, product_id: str, quantity: int):
-    stock = get_kiosk_stock(guild_id, product_id)
-    if stock < quantity:
+    is_lb = product_id == "lemon_black"
+    stock = 999 if is_lb else get_kiosk_stock(guild_id, product_id)
+    if not is_lb and stock < quantity:
         with get_connection() as conn:
             ensure_user(conn, guild_id, user_id)
             user = conn.execute(
@@ -1296,7 +1324,6 @@ def normal_purchase(guild_id: int, user_id: int, product_id: str, quantity: int)
             return False, int(user["money"]), 0, "out_of_stock", stock
 
     unit_price, _, _ = get_product_price(guild_id, product_id)
-    total = unit_price * quantity
 
     with get_connection() as conn:
         ensure_user(conn, guild_id, user_id)
@@ -1305,32 +1332,52 @@ def normal_purchase(guild_id: int, user_id: int, product_id: str, quantity: int)
             (guild_id, user_id),
         ).fetchone()
 
-        if user["money"] < total:
+        if is_lb:
+            if user["has_lemon_black"] == 1:
+                return False, int(user["money"]), 0, "already_lemon_black", stock
+            total = 50000
+        else:
+            # 15% de descuento permanente si tiene Lemon Black
+            if user["has_lemon_black"] == 1:
+                unit_price = max(1, int(unit_price * 0.85))
+            total = unit_price * quantity
+
+        cursor = conn.execute(
+            "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
+            (total, guild_id, user_id, total),
+        )
+        if cursor.rowcount == 0:
             return False, int(user["money"]), total, "no_money", stock
 
-        conn.execute(
-            "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=?",
-            (total, guild_id, user_id),
-        )
-        conn.execute(
-            """
-            INSERT INTO inventory (guild_id, user_id, product_id, quantity)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(guild_id, user_id, product_id)
-            DO UPDATE SET quantity=quantity+excluded.quantity
-            """,
-            (guild_id, user_id, product_id, quantity),
-        )
-        conn.execute(
-            "UPDATE kiosk_stock SET stock=stock-? WHERE guild_id=? AND product_id=?",
-            (quantity, guild_id, product_id),
-        )
+        if is_lb:
+            conn.execute(
+                "UPDATE users SET has_lemon_black=1 WHERE guild_id=? AND user_id=?",
+                (guild_id, user_id),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO inventory (guild_id, user_id, product_id, quantity)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(guild_id, user_id, product_id)
+                DO UPDATE SET quantity=quantity+excluded.quantity
+                """,
+                (guild_id, user_id, product_id, quantity),
+            )
+            conn.execute(
+                "UPDATE kiosk_stock SET stock=stock-? WHERE guild_id=? AND product_id=?",
+                (quantity, guild_id, product_id),
+            )
 
     record_sale(guild_id, user_id, product_id, quantity, total, is_fiado=False)
-    return True, int(user["money"]) - total, total, "ok", stock - quantity
+    return True, int(user["money"]) - total, total, "ok", (stock - quantity) if not is_lb else 999
 
 
 def fiado_purchase(guild_id: int, user_id: int, product_id: str, quantity: int):
+    if product_id == "lemon_black":
+        user = get_user(guild_id, user_id)
+        return "no_fiado_lemon_black", dict(user), 0, 999
+
     stock = get_kiosk_stock(guild_id, product_id)
     if stock < quantity:
         with get_connection() as conn:
@@ -1342,7 +1389,6 @@ def fiado_purchase(guild_id: int, user_id: int, product_id: str, quantity: int):
             return "out_of_stock", dict(user), 0, stock
 
     unit_price, _, _ = get_product_price(guild_id, product_id)
-    total = unit_price * quantity
 
     with get_connection() as conn:
         ensure_user(conn, guild_id, user_id)
@@ -1350,6 +1396,10 @@ def fiado_purchase(guild_id: int, user_id: int, product_id: str, quantity: int):
             "SELECT * FROM users WHERE guild_id=? AND user_id=?",
             (guild_id, user_id),
         ).fetchone()
+
+        if user["has_lemon_black"] == 1:
+            unit_price = max(1, int(unit_price * 0.85))
+        total = unit_price * quantity
 
         required = CONFIG["fiado_xp_required"]
         debt_limit = CONFIG["fiado_debt_limit"]
@@ -1485,9 +1535,20 @@ def profile_embed(member: discord.Member, guild_id: int) -> discord.Embed:
     required = CONFIG["fiado_xp_required"]
     unlocked = user["xp"] >= required
 
+    user_keys = user.keys() if hasattr(user, "keys") else []
+    title_text = user["custom_title"] if ("custom_title" in user_keys and user["custom_title"]) else ""
+    has_lb = user["has_lemon_black"] if ("has_lemon_black" in user_keys and user["has_lemon_black"]) else 0
+
+    desc_lines = []
+    if title_text:
+        desc_lines.append(f"🏷️ **Título:** `{title_text}`")
+    if has_lb:
+        desc_lines.append("💳 **Miembro Lemon Black VIP** *(15% OFF permanente)*")
+
     embed = discord.Embed(
         title=f"👤 Perfil de {member.display_name}",
-        color=discord.Color.gold(),
+        description="\n".join(desc_lines) if desc_lines else None,
+        color=discord.Color.from_rgb(45, 45, 45) if has_lb else discord.Color.gold(),
     )
     embed.add_field(name="💵 Billetera", value=money(user["money"]), inline=True)
     embed.add_field(name="⭐ Experiencia", value=f"{user['xp']} XP", inline=True)
@@ -2886,16 +2947,16 @@ class RaspaditaGameView(discord.ui.View):
         self.lock = asyncio.Lock()
 
         # Probabilidades balanceadas:
-        # 0.5% -> Pozo Acumulado (🍋)
-        # 7.5% -> Diamantes $3.500 (💎)
+        # 0.15% -> Pozo Acumulado (🍋) (1 en 666)
+        # 7.85% -> Diamantes $3.500 (💎)
         # 12.0% -> Golosinas $1.500 + Alfajor (🍫)
-        # 80.0% -> Sin premio
+        # 80.0% -> Sin premio (+$400 al pozo)
         roll = random.random()
-        if roll < 0.005:
+        if roll < 0.0015:
             self.win_type = "🍋"
-        elif roll < 0.080:
+        elif roll < 0.0800:
             self.win_type = "💎"
-        elif roll < 0.200:
+        elif roll < 0.2000:
             self.win_type = "🍫"
         else:
             self.win_type = None
@@ -5404,6 +5465,241 @@ async def admin_resetear_raspaditas(interaction: discord.Interaction, usuario: d
     reset_user_raspadita_daily_count(interaction.guild_id, usuario.id)
     await interaction.response.send_message(
         f"♻️ Se ha reiniciado el límite diario de raspaditas para {usuario.mention}. Ahora tiene **0/{RASPADITA_DAILY_LIMIT}** cartones jugados hoy.",
+        ephemeral=True,
+    )
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+
+@bot.tree.command(name="lemon_black", description="Comprar la Tarjeta VIP Lemon Black ($50.000) con 15% de descuento permanente.")
+@app_commands.guild_only()
+async def lemon_black_cmd(interaction: discord.Interaction):
+    user = get_user(interaction.guild_id, interaction.user.id)
+    if user["has_lemon_black"] == 1:
+        embed = discord.Embed(
+            title="💳 Ya sos Miembro Lemon Black VIP",
+            description="¡Ya contás con la **Tarjeta Lemon Black** activa!\nDisfrutás de un **15% de descuento permanente** en todas las compras del mostrador.",
+            color=discord.Color.from_rgb(45, 45, 45),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
+        return
+
+    if user["money"] < 50000:
+        embed = discord.Embed(
+            title="💳 Tarjeta Lemon Black VIP ($50.000)",
+            description=(
+                f"❌ **No te alcanza la plata.**\n\n"
+                f"💵 **Precio:** **$50.000**\n"
+                f"💼 Tu saldo actual: **{money(user['money'])}**\n\n"
+                "**Beneficios exclusivos:**\n"
+                "• 🏷️ **15% de descuento permanente** en todas las compras de golosinas del kiosco.\n"
+                "• 👑 **Rol exclusivo `@Lemon Black`** en Discord.\n"
+                "• 💳 **Insignia VIP** en tu tarjeta de `/perfil`."
+            ),
+            color=discord.Color.red(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        asyncio.create_task(auto_delete_interaction(interaction, 180))
+        return
+
+    with get_connection() as conn:
+        ensure_user(conn, interaction.guild_id, interaction.user.id)
+        cursor = conn.execute(
+            "UPDATE users SET money=money-50000, has_lemon_black=1 WHERE guild_id=? AND user_id=? AND money >= 50000",
+            (interaction.guild_id, interaction.user.id),
+        )
+        if cursor.rowcount == 0:
+            await interaction.response.send_message("💸 No tenés suficiente plata en tu billetera.", ephemeral=True)
+            return
+
+    # Asignar rol Lemon Black
+    role = await get_or_create_lemon_black_role(interaction.guild)
+    if role and isinstance(interaction.user, discord.Member):
+        try:
+            await interaction.user.add_roles(role, reason="Compra de Tarjeta Lemon Black VIP")
+        except Exception:
+            pass
+
+    user = get_user(interaction.guild_id, interaction.user.id)
+    embed = discord.Embed(
+        title="👑 ¡BIENVENIDO AL CLUB LEMON BLACK VIP! 💳✨",
+        description=(
+            f"¡Felicitaciones {interaction.user.mention}! Adquiriste la **Tarjeta Lemon Black**.\n\n"
+            "**Tus beneficios ya están activos:**\n"
+            "• 🏷️ **15% de descuento** en todas tus compras del kiosquito.\n"
+            "• 👑 **Rol `@Lemon Black`** asignado en el servidor.\n"
+            "• 💳 **Insignia VIP** agregada a tu `/perfil`.\n\n"
+            f"💼 **Saldo restante:** **{money(user['money'])}**"
+        ),
+        color=discord.Color.from_rgb(45, 45, 45),
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+    if interaction.channel:
+        try:
+            msg = await interaction.channel.send(
+                f"💳✨ **¡ATENCIÓN VECINOS!** {interaction.user.mention} acaba de adquirir la **Tarjeta Lemon Black VIP** 🍾🎩. ¡Un verdadero magnate del kiosquito!"
+            )
+            record_consumption_message(interaction.guild_id, interaction.channel_id, msg.id)
+        except Exception:
+            pass
+
+
+@bot.tree.command(name="titulo_comprar", description="Comprar o cambiar un título personalizado para tu /perfil ($20.000).")
+@app_commands.describe(texto="Título que aparecerá en tu perfil (máx. 32 caracteres)")
+@app_commands.guild_only()
+async def titulo_comprar(interaction: discord.Interaction, texto: str):
+    clean_text = texto.strip()
+    if len(clean_text) < 2 or len(clean_text) > 32:
+        await interaction.response.send_message("❌ El título debe tener entre **2 y 32 caracteres**.", ephemeral=True)
+        return
+
+    if "@everyone" in clean_text or "@here" in clean_text or "http://" in clean_text or "https://" in clean_text or "<@" in clean_text:
+        await interaction.response.send_message("❌ El título no puede contener links ni menciones.", ephemeral=True)
+        return
+
+    user = get_user(interaction.guild_id, interaction.user.id)
+    if user["money"] < 20000:
+        await interaction.response.send_message(
+            f"💸 No te alcanza la plata. El título cuesta **$20.000** y tenés **{money(user['money'])}**.",
+            ephemeral=True,
+        )
+        return
+
+    with get_connection() as conn:
+        ensure_user(conn, interaction.guild_id, interaction.user.id)
+        cursor = conn.execute(
+            "UPDATE users SET money=money-20000, custom_title=? WHERE guild_id=? AND user_id=? AND money >= 20000",
+            (clean_text, interaction.guild_id, interaction.user.id),
+        )
+        if cursor.rowcount == 0:
+            await interaction.response.send_message("💸 No tenés suficiente plata en tu billetera.", ephemeral=True)
+            return
+
+    user = get_user(interaction.guild_id, interaction.user.id)
+    embed = discord.Embed(
+        title="🏷️ ¡Título Personalizado Comprado con Éxito!",
+        description=(
+            f"Tu nuevo título en `/perfil` es: **`{clean_text}`**.\n\n"
+            f"💵 **Cobro:** **$20.000**\n"
+            f"💼 **Saldo restante:** **{money(user['money'])}**\n\n"
+            "💡 *Podés ver cómo luce usando `/perfil`.*"
+        ),
+        color=discord.Color.green(),
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+
+@bot.tree.command(name="apodo_servidor", description="Cambiar tu apodo en el servidor de Discord por plata ($35.000).")
+@app_commands.describe(nuevo_apodo="Nuevo apodo en el servidor (máx. 32 caracteres)")
+@app_commands.guild_only()
+async def apodo_servidor(interaction: discord.Interaction, nuevo_apodo: str):
+    clean_nick = nuevo_apodo.strip()
+    if len(clean_nick) < 1 or len(clean_nick) > 32:
+        await interaction.response.send_message("❌ El apodo debe tener entre **1 y 32 caracteres**.", ephemeral=True)
+        return
+
+    if "@everyone" in clean_nick or "@here" in clean_nick or "<@" in clean_nick:
+        await interaction.response.send_message("❌ El apodo no puede contener menciones.", ephemeral=True)
+        return
+
+    if interaction.user.id == interaction.guild.owner_id:
+        await interaction.response.send_message(
+            "👑 Sos el Dueño del Servidor. Por restricciones de Discord, ningún bot puede cambiarle el apodo al creador del servidor. ¡No se te cobró nada!",
+            ephemeral=True,
+        )
+        return
+
+    user = get_user(interaction.guild_id, interaction.user.id)
+    if user["money"] < 35000:
+        await interaction.response.send_message(
+            f"💸 No te alcanza la plata. Cambiar tu apodo cuesta **$35.000** y tenés **{money(user['money'])}**.",
+            ephemeral=True,
+        )
+        return
+
+    if isinstance(interaction.user, discord.Member):
+        try:
+            await interaction.user.edit(nick=clean_nick, reason="Compra de apodo en el kiosquito ($35.000)")
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ El bot no tiene permisos jerárquicos suficientes para cambiar tu apodo (tu rol más alto está por encima del rol del bot). ¡No se te cobró nada!",
+                ephemeral=True,
+            )
+            return
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Ocurrió un error al cambiar el apodo: {e}", ephemeral=True)
+            return
+
+    with get_connection() as conn:
+        ensure_user(conn, interaction.guild_id, interaction.user.id)
+        cursor = conn.execute(
+            "UPDATE users SET money=money-35000 WHERE guild_id=? AND user_id=? AND money >= 35000",
+            (interaction.guild_id, interaction.user.id),
+        )
+        if cursor.rowcount == 0:
+            await interaction.response.send_message("💸 No tenés suficiente plata en tu billetera.", ephemeral=True)
+            return
+
+    user = get_user(interaction.guild_id, interaction.user.id)
+    embed = discord.Embed(
+        title="✨ ¡Apodo Actualizado en el Servidor!",
+        description=(
+            f"Tu apodo ahora es: **{clean_nick}**.\n\n"
+            f"💵 **Cobro:** **$35.000**\n"
+            f"💼 **Saldo restante:** **{money(user['money'])}**"
+        ),
+        color=discord.Color.green(),
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+
+@bot.tree.command(name="admin_dar_lemon_black", description="[Admin] Dar o quitar la membresía Lemon Black VIP a un usuario.")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(usuario="Usuario", activado="True para dar Lemon Black, False para quitar")
+@app_commands.guild_only()
+async def admin_dar_lemon_black(interaction: discord.Interaction, usuario: discord.Member, activado: bool):
+    with get_connection() as conn:
+        ensure_user(conn, interaction.guild_id, usuario.id)
+        conn.execute(
+            "UPDATE users SET has_lemon_black=? WHERE guild_id=? AND user_id=?",
+            (1 if activado else 0, interaction.guild_id, usuario.id),
+        )
+
+    role = await get_or_create_lemon_black_role(interaction.guild)
+    if role:
+        try:
+            if activado:
+                await usuario.add_roles(role, reason="Asignado por Admin")
+            else:
+                await usuario.remove_roles(role, reason="Removido por Admin")
+        except Exception:
+            pass
+
+    estado = "activada (15% OFF)" if activado else "desactivada"
+    await interaction.response.send_message(
+        f"💳 Membresía Lemon Black de {usuario.mention} **{estado}**.",
+        ephemeral=True,
+    )
+    asyncio.create_task(auto_delete_interaction(interaction, 180))
+
+
+@bot.tree.command(name="admin_quitar_titulo", description="[Admin] Eliminar el título personalizado de un usuario.")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(usuario="Usuario")
+@app_commands.guild_only()
+async def admin_quitar_titulo(interaction: discord.Interaction, usuario: discord.Member):
+    with get_connection() as conn:
+        ensure_user(conn, interaction.guild_id, usuario.id)
+        conn.execute(
+            "UPDATE users SET custom_title='' WHERE guild_id=? AND user_id=?",
+            (interaction.guild_id, usuario.id),
+        )
+    await interaction.response.send_message(
+        f"🏷️ Se ha eliminado el título personalizado de {usuario.mention}.",
         ephemeral=True,
     )
     asyncio.create_task(auto_delete_interaction(interaction, 180))
