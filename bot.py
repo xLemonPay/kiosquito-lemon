@@ -3748,6 +3748,66 @@ async def run_quiniela_draw(guild: discord.Guild, target_channel: discord.TextCh
         QUINIELA_DRAWING.discard(guild.id)
 
 
+async def send_quiniela_reminder_morning(guild: discord.Guild):
+    channel = await get_or_create_kiosk_channel(guild)
+    if not channel:
+        return
+    banner_path = ROOT / "assets" / "quiniela" / "banner.png"
+    embed = discord.Embed(
+        title="☀️ ¡BUEN DÍA VECINOS! HOY HAY QUINIELA A LAS 22:00 HS 🎱🍀",
+        description=(
+            "🧔 **El Kiosquero:** *«¡Arriba la gente linda del barrio! Ya abrimos la recepción de boletas para el sorteo oficial de esta noche.»*\n\n"
+            "🎟️ **¿Cómo jugar?**\n"
+            "• Elegí tu número del **01 al 50**.\n"
+            "• Podés jugar con `/quiniela [numero] [apuesta]` o tocando el botón **`🎱 Quiniela`** en el mostrador.\n\n"
+            "🏆 **Tabla de Premios:**\n"
+            "• 🎯 **Acierto a la cabeza:** Paga **x35 veces** tu apuesta.\n"
+            "• 🤏 **Pegó en el palo:** Paga **x2 veces** tu apuesta.\n\n"
+            "⏰ *El sorteo en vivo se realiza hoy a las **22:00 hs** (Hora Argentina). ¡No te olvides de meter tu jugada!*"
+        ),
+        color=discord.Color.gold(),
+    )
+    try:
+        if banner_path.exists():
+            file = discord.File(str(banner_path), filename="banner.png")
+            embed.set_image(url="attachment://banner.png")
+            msg = await channel.send(embed=embed, file=file)
+        else:
+            msg = await channel.send(embed=embed)
+        asyncio.create_task(auto_delete_message(msg, 3600))
+    except Exception:
+        pass
+
+
+async def send_quiniela_reminder_afternoon(guild: discord.Guild):
+    channel = await get_or_create_kiosk_channel(guild)
+    if not channel:
+        return
+    banner_path = ROOT / "assets" / "quiniela" / "banner.png"
+    embed = discord.Embed(
+        title="☕ ¡RECORDATORIO DE LA TARDE! HOY HAY QUINIELA A LAS 22:00 HS 🎱✨",
+        description=(
+            "🧔 **El Kiosquero:** *«¡Buenas tardes a todos! Les recuerdo que las apuestas para la Quiniela siguen abiertas en el mostrador.»*\n\n"
+            "🎯 ¿Todavía no jugaste tu número de la suerte?\n"
+            "• Apuestas desde **$100** hasta **$1.000** (hasta 3 jugadas por vecino).\n"
+            "• El acierto a la cabeza se lleva **x35 veces** lo jugado 💸🍾.\n\n"
+            "👉 Jugá con `/quiniela [numero] [apuesta]` o desde el panel de <#el-kiosquito-de-lemon>.\n"
+            "🔔 *El bolillero girará en vivo a las **22:00 hs**.*"
+        ),
+        color=discord.Color.gold(),
+    )
+    try:
+        if banner_path.exists():
+            file = discord.File(str(banner_path), filename="banner.png")
+            embed.set_image(url="attachment://banner.png")
+            msg = await channel.send(embed=embed, file=file)
+        else:
+            msg = await channel.send(embed=embed)
+        asyncio.create_task(auto_delete_message(msg, 3600))
+    except Exception:
+        pass
+
+
 async def send_quiniela_announcement_20m(guild: discord.Guild):
     channel = await get_or_create_kiosk_channel(guild)
     if not channel:
@@ -4707,7 +4767,17 @@ async def presence_loop():
         auto_quiniela = get_setting(guild.id, "quiniela_auto_enabled", "1") == "1"
         if auto_quiniela:
             today_str = now.strftime("%Y-%m-%d")
-            if now.hour == 21 and now.minute == 40:
+            if now.hour == 10 and now.minute == 0:
+                last_10am = get_setting(guild.id, "last_quiniela_10am_date", "")
+                if last_10am != today_str:
+                    set_setting(guild.id, "last_quiniela_10am_date", today_str)
+                    await send_quiniela_reminder_morning(guild)
+            elif now.hour == 15 and now.minute == 0:
+                last_15hs = get_setting(guild.id, "last_quiniela_15hs_date", "")
+                if last_15hs != today_str:
+                    set_setting(guild.id, "last_quiniela_15hs_date", today_str)
+                    await send_quiniela_reminder_afternoon(guild)
+            elif now.hour == 21 and now.minute == 40:
                 last_20m = get_setting(guild.id, "last_quiniela_20m_date", "")
                 if last_20m != today_str:
                     set_setting(guild.id, "last_quiniela_20m_date", today_str)
@@ -5918,14 +5988,14 @@ async def admin_sortear_quiniela_cmd(interaction: discord.Interaction):
     await run_quiniela_draw(interaction.guild, target_channel=interaction.channel, is_private=False)
 
 
-@bot.tree.command(name="admin_quiniela_automatica", description="[Admin] Activar o desactivar los anuncios y sorteos automáticos a las 22:00 hs.")
+@bot.tree.command(name="admin_quiniela_automatica", description="[Admin] Activar o desactivar los anuncios (10:00, 15:00, 21:40, 21:55) y sorteos a las 22:00 hs.")
 @app_commands.checks.has_permissions(manage_guild=True)
-@app_commands.describe(activado="True para activar sorteos automáticos diarios, False para dejarlos en modo manual/test.")
+@app_commands.describe(activado="True para activar avisos y sorteos automáticos diarios, False para modo manual/test.")
 @app_commands.guild_only()
 async def admin_quiniela_automatica_cmd(interaction: discord.Interaction, activado: bool):
     set_setting(interaction.guild_id, "quiniela_auto_enabled", "1" if activado else "0")
     status = (
-        "🟢 **ACTIVADA** (el bot publicará anuncios a las 21:40 y 21:55, y sorteará en vivo a las 22:00 hs)"
+        "🟢 **ACTIVADA** (el bot publicará recordatorios a las 10:00 y 15:00 hs, avisos previos a las 21:40 y 21:55 hs, y sorteará en vivo a las 22:00 hs)"
         if activado
         else "🔴 **DESACTIVADA (MODO TEST)** (no se enviará ningún aviso automático; solo se sortea manualmente con `/admin_sortear_quiniela`)"
     )

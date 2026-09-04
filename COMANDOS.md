@@ -42,6 +42,12 @@
   - 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** la apuesta.
   - 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** la apuesta.
   - 🔔 Asigna el rol `@Quinielero` automáticamente para notificar en el sorteo en vivo.
+  - ⏰ **Horarios automáticos (Hora Argentina):**
+    - `10:00 hs` ➔ Recordatorio matutino de apertura de boletas.
+    - `15:00 hs` ➔ Recordatorio de la tarde para no olvidar participar.
+    - `21:40 hs` ➔ Aviso de últimos 20 minutos de apuestas.
+    - `21:55 hs` ➔ Aviso de últimos 5 minutos con mención a `@Quinielero`.
+    - `22:00 hs` ➔ Sorteo oficial del bolillero en vivo.
 
 ## 👑 Estatus VIP y Personalización
 - `/lemon_black` — Adquirir la **Tarjeta Lemon Black VIP** ($50.000) con **15% de descuento permanente** en todas las golosinas del mostrador, rol exclusivo `@Lemon Black` e insignia en tu `/perfil`.
