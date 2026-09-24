@@ -3209,20 +3209,6 @@ class RaspaditaConfirmView(discord.ui.View):
         with get_connection() as conn:
             ensure_user(conn, self.guild_id, self.user_id)
 
-            # Verificar límite diario atómicamente
-            row = conn.execute(
-                "SELECT count FROM raspadita_daily WHERE guild_id=? AND user_id=? AND play_date=?",
-                (self.guild_id, self.user_id, today_str),
-            ).fetchone()
-            daily_count = row["count"] if row else 0
-            if daily_count >= RASPADITA_DAILY_LIMIT:
-                await interaction.response.edit_message(
-                    content=f"🛑 **Límite diario alcanzado:** Ya compraste tus **{RASPADITA_DAILY_LIMIT} cartones** de Raspadita permitidos por hoy ({RASPADITA_DAILY_LIMIT}/{RASPADITA_DAILY_LIMIT}). ¡Volvé mañana a tentar a la suerte!",
-                    embed=None,
-                    view=None,
-                )
-                return
-
             # Deducción atómica con verificación en SQL para evitar saldo negativo
             cursor = conn.execute(
                 "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
@@ -3274,20 +3260,6 @@ async def start_raspadita_session(interaction: discord.Interaction):
             f"🔒 La lotería del kiosco está cerrada. Volvemos a abrir a las **{next_opening()}**.",
             ephemeral=True,
         )
-        asyncio.create_task(auto_delete_interaction(interaction, 180))
-        return
-
-    daily_count = get_user_raspadita_daily_count(interaction.guild_id, interaction.user.id)
-    if daily_count >= RASPADITA_DAILY_LIMIT:
-        embed = discord.Embed(
-            title=f"🛑 Límite Diario de Raspaditas Alcanzado ({RASPADITA_DAILY_LIMIT}/{RASPADITA_DAILY_LIMIT})",
-            description=(
-                f"Ya compraste tus **{RASPADITA_DAILY_LIMIT} cartones** de Raspadita permitidos para el día de hoy.\n\n"
-                "⏰ *El cupo se renueva a las 00:00 hs. ¡Mañana te esperamos para seguir tentando a la suerte!*"
-            ),
-            color=discord.Color.red(),
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
         asyncio.create_task(auto_delete_interaction(interaction, 180))
         return
 
@@ -3401,13 +3373,6 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
             ).fetchone()
             current_bets_count = row["c"] if row else 0
 
-            if current_bets_count >= 3:
-                await interaction.response.send_message(
-                    "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 22:00 hs para ver los resultados!",
-                    ephemeral=True,
-                )
-                return
-
             cursor = conn.execute(
                 "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
                 (apuesta, self.guild_id, interaction.user.id, apuesta),
@@ -3452,7 +3417,7 @@ class QuinielaBetModal(discord.ui.Modal, title="🎱 Apostar en la Quiniela"):
             description=(
                 f"🧔 **El Kiosquero:** *«¡Anotado en la boleta, maestro! Mucha suerte hoy.»*\n\n"
                 f"🎱 **Tu Número:** **`{num:02d}` — {num_info['name']} {num_info['emoji']}**\n"
-                f"💵 **Tu Apuesta:** **{money(apuesta)}** *(Llevás {total_bets_now}/3 jugadas hoy)*\n\n"
+                f"💵 **Tu Apuesta:** **{money(apuesta)}** *(Llevás {total_bets_now} jugada/s hoy)*\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "🏆 **Premios Potenciales:**\n"
                 f"• 🎯 **Acierto a la cabeza (x35):** **+{money(premio_potencial)}**\n"
@@ -3472,10 +3437,6 @@ class QuinielaView(discord.ui.View):
         self.user_id = user_id
         self.guild_id = guild_id
         self.parent_interaction = parent_interaction
-
-        if user_bets_count >= 3:
-            self.bet_button.disabled = True
-            self.bet_button.label = "Límite de 3 alcanzado"
 
     @discord.ui.button(
         label="Elegir Número y Apostar",
@@ -3544,11 +3505,9 @@ async def start_quiniela_session(interaction: discord.Interaction):
             info = QUINIELA_NUMBERS.get(num, {"name": f"Número {num}", "emoji": "🎱"})
             potencial = b["bet_amount"] * 35
             bets_lines.append(f"• **`{num:02d}` — {info['name']} {info['emoji']}** (`{money(b['bet_amount'])}`) ➔ Cobrás **{money(potencial)}**")
-        bets_text = f"🎟️ **Tus apuestas para hoy ({bets_count}/3):**\n" + "\n".join(bets_lines) + "\n\n"
+        bets_text = f"🎟️ **Tus apuestas para hoy ({bets_count}):**\n" + "\n".join(bets_lines) + "\n\n"
     else:
-        bets_text = "🎟️ **Tus apuestas para hoy (0/3):** *Aún no jugaste ningún número hoy.*\n\n"
-
-    limit_note = "*(⚠️ Ya completaste tus 3 jugadas permitidas para el sorteo de hoy)*\n\n" if bets_count >= 3 else ""
+        bets_text = "🎟️ **Tus apuestas para hoy (0):** *Aún no jugaste ningún número hoy.*\n\n"
 
     recent_history = get_quiniela_history(interaction.guild_id)
     if recent_history:
@@ -3565,12 +3524,11 @@ async def start_quiniela_session(interaction: discord.Interaction):
         description=(
             "¡Elegí tu número de la suerte del **1 al 50** para el sorteo diario de las **22:00 hs**!\n\n"
             f"{bets_text}"
-            f"{limit_note}"
             f"{history_text}"
             "🏆 **Tabla de Pagos:**\n"
             "• 🎯 **Acierto a la cabeza (Número exacto):** Paga **x35 veces** tu apuesta.\n"
             "• 🤏 **Pegó en el palo (Número anterior o siguiente):** Paga **x2 veces** tu apuesta.\n\n"
-            f"💼 **Tu saldo actual:** **{money(user['money'])}** • Apuestas: `$100 – $1.000` (Máx 3 jugadas)\n"
+            f"💼 **Tu saldo actual:** **{money(user['money'])}** • Apuestas: `$100 – $1.000` *(¡Sin límite de jugadas!)*\n"
             "🔔 *Al apostar se te asignará el rol `@Quinielero` para recibir la notificación del sorteo.*"
         ),
         color=discord.Color.gold(),
@@ -3789,7 +3747,7 @@ async def send_quiniela_reminder_afternoon(guild: discord.Guild):
         description=(
             "🧔 **El Kiosquero:** *«¡Buenas tardes a todos! Les recuerdo que las apuestas para la Quiniela siguen abiertas en el mostrador.»*\n\n"
             "🎯 ¿Todavía no jugaste tu número de la suerte?\n"
-            "• Apuestas desde **$100** hasta **$1.000** (hasta 3 jugadas por vecino).\n"
+            "• Apuestas desde **$100** hasta **$1.000** (¡sin límite de apuestas por vecino!).\n"
             "• El acierto a la cabeza se lleva **x35 veces** lo jugado 💸🍾.\n\n"
             "👉 Jugá con `/quiniela [numero] [apuesta]` o desde el panel de <#el-kiosquito-de-lemon>.\n"
             "🔔 *El bolillero girará en vivo a las **22:00 hs**.*"
@@ -5921,13 +5879,6 @@ async def quiniela_cmd(
             (interaction.guild_id, interaction.user.id),
         ).fetchone()
         current_bets_count = row["c"] if row else 0
-
-        if current_bets_count >= 3:
-            await interaction.response.send_message(
-                "❌ Ya alcanzaste el límite máximo de **3 apuestas activas** para el sorteo de hoy. ¡Esperá a las 22:00 hs para ver los resultados!",
-                ephemeral=True,
-            )
-            return
 
         cursor = conn.execute(
             "UPDATE users SET money=money-? WHERE guild_id=? AND user_id=? AND money >= ?",
